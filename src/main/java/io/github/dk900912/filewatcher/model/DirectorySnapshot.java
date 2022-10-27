@@ -24,7 +24,8 @@ import static io.github.dk900912.filewatcher.model.ChangedFile.Type.MODIFY;
  */
 public final class DirectorySnapshot {
 
-    private static final Set<String> DOTS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(".", "..")));
+    private static final Set<String> DOTS
+            = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(".", "..")));
 
     private final File directory;
 
@@ -59,7 +60,7 @@ public final class DirectorySnapshot {
         }
     }
 
-    public ChangedFiles getChangedFiles(DirectorySnapshot snapshot, FileFilter triggerFilter) {
+    public ChangedFiles getChangedFiles(DirectorySnapshot snapshot, FileFilter fileFilter) {
         Assert.notNull(snapshot, "Snapshot must not be null");
         File directory = this.directory;
         Assert.isTrue(snapshot.directory.equals(directory),
@@ -67,7 +68,7 @@ public final class DirectorySnapshot {
         Set<ChangedFile> changes = new LinkedHashSet<>();
         Map<File, FileSnapshot> previousFiles = getFilesMap();
         for (FileSnapshot currentFile : snapshot.files) {
-            if (acceptChangedFile(triggerFilter, currentFile)) {
+            if (acceptChangedFile(fileFilter, currentFile)) {
                 FileSnapshot previousFile = previousFiles.remove(currentFile.getFile());
                 if (previousFile == null) {
                     changes.add(new ChangedFile(directory, currentFile.getFile(), ADD));
@@ -77,7 +78,7 @@ public final class DirectorySnapshot {
             }
         }
         for (FileSnapshot previousFile : previousFiles.values()) {
-            if (acceptChangedFile(triggerFilter, previousFile)) {
+            if (acceptChangedFile(fileFilter, previousFile)) {
                 changes.add(new ChangedFile(directory, previousFile.getFile(), DELETE));
             }
         }
@@ -125,8 +126,8 @@ public final class DirectorySnapshot {
         return this.directory + " snapshot at " + this.time;
     }
 
-    private boolean acceptChangedFile(FileFilter triggerFilter, FileSnapshot file) {
-        return (triggerFilter == null || !triggerFilter.accept(file.getFile()));
+    private boolean acceptChangedFile(FileFilter fileFilter, FileSnapshot file) {
+        return (fileFilter == null || fileFilter.accept(file.getFile()));
     }
 
     private Map<File, FileSnapshot> getFilesMap() {

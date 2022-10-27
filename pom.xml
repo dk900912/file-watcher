@@ -6,7 +6,7 @@
 
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 
     <name>file-watcher</name>
     <description>Watching specific directories for file changes.</description>
@@ -46,9 +46,15 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
             <version>${slf4j.version}</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+            <version>${slf4j.version}</version>
+        </dependency>
     </dependencies>
 
     <distributionManagement>

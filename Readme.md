@@ -6,13 +6,21 @@
 <a href="https://github.com/dk900912/file-watcher/stargazers"><img src="https://img.shields.io/github/stars/dk900912/file-watcher" alt="GitHub Stars"></a>
 <a href="https://github.com/dk900912/file-watcher/fork"><img src="https://img.shields.io/github/forks/dk900912/file-watcher" alt="GitHub Forks"></a>
 <a href="https://github.com/dk900912/file-watcher/issues"><img src="https://img.shields.io/github/issues/dk900912/file-watcher" alt="GitHub issues"></a>
-<a href="https://github.com/dk900912/efile-watcher/graphs/contributors"><img src="https://img.shields.io/github/contributors/dk900912/file-watcher" alt="GitHub Contributors"></a>
+<a href="https://github.com/dk900912/file-watcher/graphs/contributors"><img src="https://img.shields.io/github/contributors/dk900912/file-watcher" alt="GitHub Contributors"></a>
 <a href="https://github.com/dk900912/file-watcher"><img src="https://img.shields.io/github/repo-size/dk900912/file-watcher" alt="GitHub repo size"></a>
 </p>
 
->> 很简单的功能，但由于之前写的很 low，这次实现尽量更加地面向对象罢了。
+>> 本地文件变更监听是很简单的功能，但由于之前写的很 low，这次实现尽量更加地面向对象罢了。对于文件的重命名会先触发 ADD 事件，然后才是 DELETE 事件！
 
 ### How to use
+```xml
+<dependency>
+    <groupId>io.github.dk900912</groupId>
+    <artifactId>file-watcher</artifactId>
+    <version>1.0.1</version>
+</dependency>
+```
+
 ```java
 public class FileWatcherApplication {
     public static void main(String[] args) {
@@ -21,6 +29,8 @@ public class FileWatcherApplication {
         File directory1 = new File("C:\\Users\\dk900912\\IdeaProjects\\test");
         File directory2 = new File("C:\\Users\\dk900912\\IdeaProjects\\tset");
         fileWatcher.addSourceDirectories(Arrays.asList(directory1, directory2));
+        // 仅仅监听 txt 文本文件的变更
+        fileWatcher.setFileFilter(pathname -> pathname.getName().endsWith(".txt"));
         fileWatcher.start();
 
         for (;;){

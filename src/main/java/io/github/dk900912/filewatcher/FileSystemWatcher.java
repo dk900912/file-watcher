@@ -47,7 +47,7 @@ public class FileSystemWatcher {
 
     private Thread watchThread;
 
-    private FileFilter triggerFilter;
+    private FileFilter fileFilter;
 
     private final Object monitor = new Object();
 
@@ -97,9 +97,9 @@ public class FileSystemWatcher {
         }
     }
 
-    public void setTriggerFilter(FileFilter triggerFilter) {
+    public void setFileFilter(FileFilter fileFilter) {
         synchronized (this.monitor) {
-            this.triggerFilter = triggerFilter;
+            this.fileFilter = fileFilter;
         }
     }
 
@@ -117,7 +117,7 @@ public class FileSystemWatcher {
             createOrRestoreInitialSnapshots();
             if (this.watchThread == null) {
                 Map<File, DirectorySnapshot> localDirectories = new HashMap<>(this.directories);
-                Watcher watcher = new Watcher(this.remainingScans, new ArrayList<>(this.listeners), this.triggerFilter,
+                Watcher watcher = new Watcher(this.remainingScans, new ArrayList<>(this.listeners), this.fileFilter,
                         this.pollInterval, this.quietPeriod, localDirectories, this.snapshotStateRepository);
                 this.watchThread = new Thread(watcher);
                 this.watchThread.setName("File Watcher");
@@ -174,7 +174,7 @@ public class FileSystemWatcher {
 
         private final List<FileChangeListener> listeners;
 
-        private final FileFilter triggerFilter;
+        private final FileFilter fileFilter;
 
         private final long pollInterval;
 
@@ -184,12 +184,12 @@ public class FileSystemWatcher {
 
         private final SnapshotStateRepository snapshotStateRepository;
 
-        private Watcher(AtomicInteger remainingScans, List<FileChangeListener> listeners, FileFilter triggerFilter,
+        private Watcher(AtomicInteger remainingScans, List<FileChangeListener> listeners, FileFilter fileFilter,
                         long pollInterval, long quietPeriod, Map<File, DirectorySnapshot> directories,
                         SnapshotStateRepository snapshotStateRepository) {
             this.remainingScans = remainingScans;
             this.listeners = listeners;
-            this.triggerFilter = triggerFilter;
+            this.fileFilter = fileFilter;
             this.pollInterval = pollInterval;
             this.quietPeriod = quietPeriod;
             this.directories = directories;
@@ -234,7 +234,7 @@ public class FileSystemWatcher {
             for (Map.Entry<File, DirectorySnapshot> entry : previous.entrySet()) {
                 DirectorySnapshot previousDirectory = entry.getValue();
                 DirectorySnapshot currentDirectory = current.get(entry.getKey());
-                if (!previousDirectory.equals(currentDirectory, this.triggerFilter)) {
+                if (!previousDirectory.equals(currentDirectory, this.fileFilter)) {
                     return true;
                 }
             }
@@ -255,7 +255,7 @@ public class FileSystemWatcher {
             for (DirectorySnapshot snapshot : snapshots) {
                 DirectorySnapshot previous = this.directories.get(snapshot.getDirectory());
                 updated.put(snapshot.getDirectory(), snapshot);
-                ChangedFiles changedFiles = previous.getChangedFiles(snapshot, this.triggerFilter);
+                ChangedFiles changedFiles = previous.getChangedFiles(snapshot, this.fileFilter);
                 if (!changedFiles.getFiles().isEmpty()) {
                     changeSet.add(changedFiles);
                 }
