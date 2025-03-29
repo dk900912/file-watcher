@@ -4,10 +4,8 @@ import io.github.dk900912.filewatcher.utils.Assert;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.util.Arrays;
+import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -16,67 +14,113 @@ import java.util.Set;
 import static io.github.dk900912.filewatcher.model.ChangedFile.Type.ADD;
 import static io.github.dk900912.filewatcher.model.ChangedFile.Type.DELETE;
 import static io.github.dk900912.filewatcher.model.ChangedFile.Type.MODIFY;
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
 /**
  * A snapshot of a directory at a given point in time.
  *
  * @author dukui
  */
-public final class DirectorySnapshot {
+public class DirectorySnapshot {
 
     private static final Set<String> DOTS
-            = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(".", "..")));
+            = Set.of(".", "..");
 
     private final File directory;
 
-    private final Date time;
+    private final LocalDateTime time;
 
     private final Set<FileSnapshot> files;
 
     /**
      * Create a new {@link DirectorySnapshot} for the given directory.
-     * @param directory the source directory
+     *
+     * @param directory the directory
      */
     public DirectorySnapshot(File directory) {
         Assert.notNull(directory, "Directory must not be null");
         Assert.isTrue(!directory.isFile(), () -> "Directory '" + directory + "' must not be a file");
         this.directory = directory;
-        this.time = new Date();
+        this.time = LocalDateTime.now();
         Set<FileSnapshot> files = new LinkedHashSet<>();
         collectFiles(directory, files);
         this.files = Collections.unmodifiableSet(files);
     }
 
-    private void collectFiles(File source, Set<FileSnapshot> result) {
-        File[] children = source.listFiles();
+    /**
+     * Constructs a new DirectorySnapshot instance. This constructor is intended for internal use only.
+     *
+     * @param directory the directory to snapshot, must not be null
+     * @param time the exact snapshot capture time
+     * @param files the immutable set of file snapshots
+     */
+    public DirectorySnapshot(File directory, LocalDateTime time, Set<FileSnapshot> files) {
+        Assert.notNull(directory, "Directory must not be null");
+        Assert.isTrue(!directory.isFile(), () -> "Directory '" + directory + "' must not be a file");
+        this.directory = directory;
+        this.time = time;
+        this.files = files;
+    }
+
+    /**
+     * Recursively collects directory snapshots from the specified directory and its subdirectories
+     *
+     * @param directory   The directory to process (recursively handles directories)
+     * @param result The set to store collected directory snapshots (will be modified)
+     */
+    private void collectFiles(File directory, Set<FileSnapshot> result) {
+        File[] children = directory.listFiles();
+        // Process all entries in current directory
         if (children != null) {
             for (File child : children) {
+                // Recursively handle non-special directories (excluding "." and "..")
                 if (child.isDirectory() && !DOTS.contains(child.getName())) {
                     collectFiles(child, result);
                 } else if (child.isFile()) {
+                    // Add files to result set
                     result.add(new FileSnapshot(child));
                 }
             }
         }
     }
 
+    /**
+     * Get the changed files between this snapshot and the given one.
+     *
+     * @param snapshot the previous snapshot
+     * @param fileFilter the file filter
+     * @return the changed files
+     */
     public ChangedFiles getChangedFiles(DirectorySnapshot snapshot, FileFilter fileFilter) {
-        Assert.notNull(snapshot, "Snapshot must not be null");
+        Assert.notNull(snapshot, "DirectorySnapshot must not be null");
         File directory = this.directory;
         Assert.isTrue(snapshot.directory.equals(directory),
-                () -> "Snapshot source directory must be '" + directory + "'");
+                () -> "DirectorySnapshot's directory must be '" + directory + "'");
         Set<ChangedFile> changes = new LinkedHashSet<>();
+        // Map of previous files (this snapshot) with File as key.
+        // File equality is determined by path string comparison (case-sensitive on some OS)
         Map<File, FileSnapshot> previousFiles = getFilesMap();
         for (FileSnapshot currentFile : snapshot.files) {
+            // Skip files not matching the filter
             if (acceptChangedFile(fileFilter, currentFile)) {
+                // Remove and get the previous file snapshot by current file's path.
+                // NOTE: File equality relies on path string comparison, not physical file identity.
+                // This means files with different path representations (even if pointing to same physical file)
+                // will be considered different entries.
                 FileSnapshot previousFile = previousFiles.remove(currentFile.getFile());
                 if (previousFile == null) {
+                    // Case 1: File added (including renamed files - old path will appear as DELETE later)
                     changes.add(new ChangedFile(directory, currentFile.getFile(), ADD));
                 } else if (!previousFile.equals(currentFile)) {
+                    // Case 2: File modified (content or metadata changed)
                     changes.add(new ChangedFile(directory, currentFile.getFile(), MODIFY));
                 }
+                // Case 3: File unchanged - no action
             }
         }
+        // Remaining entries in previousFiles represent:
+        // - Deleted files (original path no longer exists)
+        // - Renamed files (original path will appear here as DELETE, new path already registered as ADD)
         for (FileSnapshot previousFile : previousFiles.values()) {
             if (acceptChangedFile(fileFilter, previousFile)) {
                 changes.add(new ChangedFile(directory, previousFile.getFile(), DELETE));
@@ -114,8 +158,8 @@ public final class DirectorySnapshot {
     }
 
     /**
-     * Return the source directory of this snapshot.
-     * @return the source directory
+     * Return the directory of this snapshot.
+     * @return the directory
      */
     public File getDirectory() {
         return this.directory;
@@ -123,7 +167,7 @@ public final class DirectorySnapshot {
 
     @Override
     public String toString() {
-        return this.directory + " snapshot at " + this.time;
+        return this.directory + " snapshot at " + ISO_LOCAL_DATE_TIME.format(this.time);
     }
 
     private boolean acceptChangedFile(FileFilter fileFilter, FileSnapshot file) {
@@ -138,12 +182,12 @@ public final class DirectorySnapshot {
         return files;
     }
 
-    private Set<FileSnapshot> filter(Set<FileSnapshot> source, FileFilter filter) {
+    private Set<FileSnapshot> filter(Set<FileSnapshot> snapshots, FileFilter filter) {
         if (filter == null) {
-            return source;
+            return snapshots;
         }
         Set<FileSnapshot> filtered = new LinkedHashSet<>();
-        for (FileSnapshot file : source) {
+        for (FileSnapshot file : snapshots) {
             if (filter.accept(file.getFile())) {
                 filtered.add(file);
             }
@@ -151,4 +195,11 @@ public final class DirectorySnapshot {
         return filtered;
     }
 
+    public LocalDateTime getTime() {
+        return time;
+    }
+
+    public Set<FileSnapshot> getFiles() {
+        return files;
+    }
 }

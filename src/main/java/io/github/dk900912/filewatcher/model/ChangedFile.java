@@ -13,7 +13,7 @@ import java.io.File;
  */
 public final class ChangedFile {
 
-    private final File sourceDirectory;
+    private final File directory;
 
     private final File file;
 
@@ -21,15 +21,16 @@ public final class ChangedFile {
 
     /**
      * Create a new {@link ChangedFile} instance.
-     * @param sourceDirectory the source directory
-     * @param file the file
-     * @param type the type of change
+     *
+     * @param directory the directory where the file resides
+     * @param file      the specific file that was changed (must be a descendant of the directory)
+     * @param type      the type of change detected (ADD/MODIFY/DELETE)
      */
-    public ChangedFile(File sourceDirectory, File file, Type type) {
-        Assert.notNull(sourceDirectory, "SourceDirectory must not be null");
+    public ChangedFile(File directory, File file, Type type) {
+        Assert.notNull(directory, "Directory must not be null");
         Assert.notNull(file, "File must not be null");
         Assert.notNull(type, "Type must not be null");
-        this.sourceDirectory = sourceDirectory;
+        this.directory = directory;
         this.file = file;
         this.type = type;
     }
@@ -43,16 +44,17 @@ public final class ChangedFile {
     }
 
     /**
-     * Return the name of the file relative to the source directory.
+     * Return the name of the file relative to the directory.
+     *
      * @return the relative name
      */
     public String getRelativeName() {
-        File directory = this.sourceDirectory.getAbsoluteFile();
+        File directory = this.directory.getAbsoluteFile();
         File file = this.file.getAbsoluteFile();
         String directoryName = StringUtil.cleanPath(directory.getPath());
         String fileName = StringUtil.cleanPath(file.getPath());
         Assert.state(fileName.startsWith(directoryName),
-                () -> "The file " + fileName + " is not contained in the source directory " + directoryName);
+                () -> "The file " + fileName + " is not contained in the directory " + directoryName);
         return fileName.substring(directoryName.length() + 1);
     }
 
@@ -64,8 +66,7 @@ public final class ChangedFile {
         if (obj == null) {
             return false;
         }
-        if (obj instanceof ChangedFile) {
-            ChangedFile other = (ChangedFile) obj;
+        if (obj instanceof ChangedFile other) {
             return this.file.equals(other.file) && this.type.equals(other.type);
         }
         return super.equals(obj);
@@ -100,7 +101,6 @@ public final class ChangedFile {
          * An existing file has been deleted.
          */
         DELETE
-
     }
 
 }

@@ -24,18 +24,20 @@ public interface SnapshotStateRepository {
     };
 
     /**
-     * A {@link SnapshotStateRepository} that uses a static instance to keep state.
+     * A {@link SnapshotStateRepository} that uses a local file to keep state.
      */
-    SnapshotStateRepository STATIC = StaticSnapshotStateRepository.INSTANCE;
+    SnapshotStateRepository LOCAL = LocalSnapshotStateRepository.INSTANCE;
 
     /**
      * Save the given state in the repository.
+     *
      * @param state the state to save
      */
     void save(Object state);
 
     /**
      * Restore any previously saved state.
+     *
      * @return the previously saved state or {@code null}
      */
     Object restore();

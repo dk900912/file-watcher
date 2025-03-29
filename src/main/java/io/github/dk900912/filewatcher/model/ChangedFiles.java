@@ -6,23 +6,23 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
- * A collections of files from a specific source directory that have changed.
+ * A collections of files from a specific directory that have changed.
  *
  * @author dukui
  */
 public final class ChangedFiles implements Iterable<ChangedFile> {
 
-    private final File sourceDirectory;
+    private final File directory;
 
     private final Set<ChangedFile> files;
 
-    public ChangedFiles(File sourceDirectory, Set<ChangedFile> files) {
-        this.sourceDirectory = sourceDirectory;
+    public ChangedFiles(File directory, Set<ChangedFile> files) {
+        this.directory = directory;
         this.files = Collections.unmodifiableSet(files);
     }
 
-    public File getSourceDirectory() {
-        return this.sourceDirectory;
+    public File getDirectory() {
+        return this.directory;
     }
 
     @Override
@@ -32,6 +32,7 @@ public final class ChangedFiles implements Iterable<ChangedFile> {
 
     /**
      * The files that have been changed.
+     *
      * @return the changed files
      */
     public Set<ChangedFile> getFiles() {
@@ -46,9 +47,8 @@ public final class ChangedFiles implements Iterable<ChangedFile> {
         if (obj == this) {
             return true;
         }
-        if (obj instanceof ChangedFiles) {
-            ChangedFiles other = (ChangedFiles) obj;
-            return this.sourceDirectory.equals(other.sourceDirectory) && this.files.equals(other.files);
+        if (obj instanceof ChangedFiles other) {
+            return this.directory.equals(other.directory) && this.files.equals(other.files);
         }
         return super.equals(obj);
     }
@@ -60,7 +60,7 @@ public final class ChangedFiles implements Iterable<ChangedFile> {
 
     @Override
     public String toString() {
-        return this.sourceDirectory + " " + this.files;
+        return this.directory + " " + this.files;
     }
 
 }

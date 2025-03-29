@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public class SimpleFileChangeListener implements FileChangeListener {
 
-    public static final Logger logger = LoggerFactory.getLogger(SimpleFileChangeListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(SimpleFileChangeListener.class);
 
     @Override
     public void onChange(Set<ChangedFiles> changeSet) {

@@ -19,13 +19,30 @@ public class FileSnapshot {
 
     private final long lastModified;
 
-    FileSnapshot(File file) {
+    public FileSnapshot(File file) {
         Assert.notNull(file, "File must not be null");
         Assert.isTrue(file.isFile() || !file.exists(), "File must not be a directory");
         this.file = file;
         this.exists = file.exists();
         this.length = file.length();
         this.lastModified = file.lastModified();
+    }
+
+    /**
+     * Constructs a new FileSnapshot instance. This constructor is intended for internal use only.
+     *
+     * @param file the file object to create a snapshot of
+     * @param exists the existence status of the file
+     * @param length the length of the file in bytes
+     * @param lastModified the last modified timestamp of the file
+     */
+    public FileSnapshot(File file, boolean exists, long length, long lastModified) {
+        Assert.notNull(file, "File must not be null");
+        Assert.isTrue(file.isFile() || !file.exists(), "File must not be a directory");
+        this.file = file;
+        this.exists = exists;
+        this.length = length;
+        this.lastModified = lastModified;
     }
 
     public File getFile() {
@@ -40,8 +57,7 @@ public class FileSnapshot {
         if (obj == null) {
             return false;
         }
-        if (obj instanceof FileSnapshot) {
-            FileSnapshot other = (FileSnapshot) obj;
+        if (obj instanceof FileSnapshot other) {
             boolean equals = this.file.equals(other.file);
             equals = equals && this.exists == other.exists;
             equals = equals && this.length == other.length;
@@ -65,4 +81,15 @@ public class FileSnapshot {
         return this.file.toString();
     }
 
+    public boolean exists() {
+        return exists;
+    }
+
+    public long getLength() {
+        return length;
+    }
+
+    public long getLastModified() {
+        return lastModified;
+    }
 }
