@@ -3,6 +3,7 @@ package io.github.dk900912.filewatcher;
 import io.github.dk900912.filewatcher.model.DirectorySnapshot;
 import io.github.dk900912.filewatcher.model.FileSnapshot;
 import io.github.dk900912.filewatcher.utils.Assert;
+import io.github.dk900912.filewatcher.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,7 @@ import java.util.Set;
  * <p>2. <b>Crash Resilience</b> - Preserves pre-crash state to detect changes occurred during
  *    service downtime through snapshot comparison during recovery.
  *
- * @author dk900912
+  * @author dukui
  * @see FileSystemWatcher
  */
 public class LocalSnapshotStateRepository implements SnapshotStateRepository {
@@ -75,11 +76,12 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
     @SuppressWarnings("unchecked")
     public synchronized void save(Object state) {
         if (!(state instanceof Map<?, ?>) || ((Map<?, ?>) state).isEmpty()) {
-            logger.error("Failed to save snapshot state due to illegal state");
+            logger.error("Unable to save snapshot state due to illegal state type");
             return;
         }
 
-        try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(storage, StandardOpenOption.CREATE))) {
+        try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(storage,
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
             
             oos.writeUTF(SERIALIZATION_VERSION);
             
@@ -121,12 +123,16 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
     @Override
     public synchronized Object restore() {
         if (!Files.exists(storage)) {
-            logger.error("Failed to restore snapshot state due to missing storage file");
+            logger.info("No snapshot file was found. A new snapshot will be created automatically upon the first save");
             return null;
         }
 
-        try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(storage))) {
-            if (!SERIALIZATION_VERSION.equals(ois.readUTF())) {
+        try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(storage, StandardOpenOption.READ))) {
+            String serialVer = ois.readUTF();
+            if (!StringUtil.hasLength(serialVer)) {
+                logger.error("The snapshot file should not be created manually");
+            }
+            if (!SERIALIZATION_VERSION.equals(serialVer)) {
                 logger.error("Failed to restore snapshot state due to a serialization version mismatch");
                 return null;
             }

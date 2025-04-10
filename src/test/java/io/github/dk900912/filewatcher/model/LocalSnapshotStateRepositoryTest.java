@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * @author dk900912
+ * @author dukui
  */
 public class LocalSnapshotStateRepositoryTest {
     private static final int MIN_DIRECTORIES = 3;

@@ -1,7 +1,7 @@
 package io.github.dk900912.filewatcher;
 
 
-import io.github.dk900912.filewatcher.filter.MatchingType;
+import io.github.dk900912.filewatcher.filter.MatchingStrategy;
 import io.github.dk900912.filewatcher.utils.Assert;
 
 import java.time.Duration;
@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @author dk900912
+ * @author dukui
  */
 public class FileWatcherProperties {
 
@@ -27,9 +27,9 @@ public class FileWatcherProperties {
 
     private List<String> directories;
 
-    private MatchingType acceptedStrategy = MatchingType.ANY;
+    private MatchingStrategy acceptedStrategy = MatchingStrategy.ANY;
 
-    private Set<String> acceptedFileFormats;
+    private Set<String> acceptedStrategyPatterns;
 
     private Duration pollInterval = Duration.ofMillis(1000);
 
@@ -75,20 +75,20 @@ public class FileWatcherProperties {
         this.directories = directories;
     }
 
-    public MatchingType getAcceptedStrategy() {
+    public MatchingStrategy getAcceptedStrategy() {
         return acceptedStrategy;
     }
 
-    public void setAcceptedStrategy(MatchingType acceptedStrategy) {
+    public void setAcceptedStrategy(MatchingStrategy acceptedStrategy) {
         this.acceptedStrategy = acceptedStrategy;
     }
 
-    public Set<String> getAcceptedFileFormats() {
-        return acceptedFileFormats;
+    public Set<String> getAcceptedFilePatterns() {
+        return acceptedStrategyPatterns;
     }
 
-    public void setAcceptedFileFormats(Set<String> acceptedFileFormats) {
-        this.acceptedFileFormats = acceptedFileFormats;
+    public void setAcceptedStrategyPatterns(Set<String> acceptedStrategyPatterns) {
+        this.acceptedStrategyPatterns = acceptedStrategyPatterns;
     }
 
     public Duration getPollInterval() {

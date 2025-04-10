@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.FileFilter;
 
 /**
- * @author dk900912
+ * @author dukui
  */
 public class AnyFilter implements FileFilter {
     @Override

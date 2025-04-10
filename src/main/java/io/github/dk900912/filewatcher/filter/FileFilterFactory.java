@@ -7,35 +7,35 @@ import org.slf4j.LoggerFactory;
 import java.io.FileFilter;
 import java.util.Set;
 
-import static io.github.dk900912.filewatcher.filter.MatchingType.ANY;
-import static io.github.dk900912.filewatcher.filter.MatchingType.REGEX;
+import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
+import static io.github.dk900912.filewatcher.filter.MatchingStrategy.REGEX;
 
 /**
- * @author dk900912
+ * @author dukui
  */
 public class FileFilterFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(FileFilterFactory.class);
 
     public static FileFilter create(FileWatcherProperties fileWatcherProperties) {
-        MatchingType acceptedStrategy = fileWatcherProperties.getAcceptedStrategy();
+        MatchingStrategy acceptedStrategy = fileWatcherProperties.getAcceptedStrategy();
         if (acceptedStrategy == null || acceptedStrategy == ANY) {
             logger.warn("FileWatcherProperties.acceptedStrategy is null or ANY, use AnyFilter");
             return new AnyFilter();
         }
-        Set<String> acceptedFileFormats = fileWatcherProperties.getAcceptedFileFormats();
-        if (acceptedFileFormats == null || acceptedFileFormats.isEmpty()) {
-            logger.warn("FileWatcherProperties.acceptedFileFormats is null or empty when acceptedStrategy is SUFFIX or REGEX, use AnyFilter");
+        Set<String> acceptedFilePatterns = fileWatcherProperties.getAcceptedFilePatterns();
+        if (acceptedFilePatterns == null || acceptedFilePatterns.isEmpty()) {
+            logger.warn("FileWatcherProperties.acceptedFilePatterns is null or empty when acceptedStrategy is SUFFIX or REGEX, use AnyFilter");
             return new AnyFilter();
         }
         if (REGEX == acceptedStrategy) {
-            if (acceptedFileFormats.size() > 1) {
-                logger.warn("FileWatcherProperties.acceptedFileFormats should contain a single regex pattern when acceptedStrategy is REGEX. Only the first element will be utilized.");
+            if (acceptedFilePatterns.size() > 1) {
+                logger.warn("FileWatcherProperties.acceptedFilePatterns should contain a single regex pattern when acceptedStrategy is REGEX. Only the first element will be utilized");
             }
             logger.info("FileWatcherProperties.acceptedStrategy is REGEX, use RegexFilter");
-            return new RegexFilter(acceptedFileFormats.stream().findFirst().get());
+            return new RegexFilter(acceptedFilePatterns.stream().findFirst().get());
         }
         logger.info("FileWatcherProperties.acceptedStrategy is SUFFIX, use SuffixFilter");
-        return new SuffixFilter(acceptedFileFormats);
+        return new SuffixFilter(acceptedFilePatterns);
     }
 }

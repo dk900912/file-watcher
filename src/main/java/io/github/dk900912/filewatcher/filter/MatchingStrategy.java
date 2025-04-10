@@ -1,11 +1,23 @@
 package io.github.dk900912.filewatcher.filter;
 
 /**
- * @author dk900912
+ * @author dukui
  */
-public interface MatchingStrategy {
+public enum MatchingStrategy {
 
-    MatchingType supports();
+    /**
+     * Any matching
+     */
+    ANY,
 
-    boolean matches(String fileName);
+    /**
+     * Suffix matching
+     */
+    SUFFIX,
+
+    /**
+     * Regular expression matching
+     */
+    REGEX
+
 }

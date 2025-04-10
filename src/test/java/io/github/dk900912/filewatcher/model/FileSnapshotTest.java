@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * @author dk900912
+ * @author dukui
  */
 public class FileSnapshotTest {
     private static File testFile;

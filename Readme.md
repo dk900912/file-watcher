@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
 </dependency>
 ```
 # 3. 快速入门
@@ -55,25 +55,25 @@ public class FileWatcherApplication {
 
 主要配置项均由`FileWatcherProperties`承载，默认配置如下：
 
-| 配置项                 | 默认值    | 说明                                       |
-|---------------------|--------|------------------------------------------|
-| directories         | null   | 监听目录列表，必须手动指定                            |
-| snapshotEnabled     | false  | 文件快照功能                                   |
-| acceptedStrategy    | MatchingType.ANY   | 文件匹配策略，默认为`AnyFilter`，即只要匹配到任何文件变更就触发监听器 |
-| acceptedFileFormats | null   | 详见`FileFilterFactory`                   |
-| pollInterval        | 1000ms | 完整扫描周期的时间间隔，控制整体扫描频率                                 |
-| quietPeriod         | 400ms  | 文件变动后的静默观察期，用于确认变更是否稳定完成                                 |
-| daemon              | true   | 监听线程是否为守护线程                              |
-| name                | "File Watcher"   | 监听线程名称                                   |
-| remainingScans      | new AtomicInteger(-1)   | 监听线程扫描文件目录的剩余次数，默认持续扫描                   |
+| 配置项                      | 默认值    | 说明                                       |
+|--------------------------|--------|------------------------------------------|
+| directories              | null   | 监听目录列表，必须手动指定                            |
+| snapshotEnabled          | false  | 文件快照功能                                   |
+| acceptedStrategy         | MatchingType.ANY   | 文件匹配策略，默认为`AnyFilter`，即只要匹配到任何文件变更就触发监听器 |
+| acceptedStrategyPatterns | null   | 详见`FileFilterFactory`                   |
+| pollInterval             | 1000ms | 完整扫描周期的时间间隔，控制整体扫描频率                                 |
+| quietPeriod              | 400ms  | 文件变动后的静默观察期，用于确认变更是否稳定完成                                 |
+| daemon                   | true   | 监听线程是否为守护线程                              |
+| name                     | "File Watcher"   | 监听线程名称                                   |
+| remainingScans           | new AtomicInteger(-1)   | 监听线程扫描文件目录的剩余次数，默认持续扫描                   |
 
 # 5. 进阶
 
 ## 5.1 关于文件监听范围
 
 默认监听目标目录下所有文件的变更事件。如果想要指定仅监听部分文件，目前支撑两种策略：
-1. `MatchingType.SUFFIX`：匹配文件后缀，可指定多中后缀，详见`SuffixFilter`;
-2. `MatchingType.REGEX`：匹配文件名正则表达式，但只能指定一个正则表达式Pattern，详见`RegexFilter`。
+1. `SUFFIX`：匹配文件后缀，可指定多中后缀，详见`SuffixFilter`;
+2. `REGEX`：匹配文件名正则表达式，但只能指定一个正则表达式Pattern，详见`RegexFilter`。
 
 ## 5.2 为什么设计文件快照
 
