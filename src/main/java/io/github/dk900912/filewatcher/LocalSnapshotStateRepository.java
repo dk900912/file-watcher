@@ -3,14 +3,15 @@ package io.github.dk900912.filewatcher;
 import io.github.dk900912.filewatcher.model.DirectorySnapshot;
 import io.github.dk900912.filewatcher.model.FileSnapshot;
 import io.github.dk900912.filewatcher.utils.Assert;
-import io.github.dk900912.filewatcher.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.StreamCorruptedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,17 +22,17 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
- /**
+/**
  * Persistent repository for storing/restoring directory snapshots to maintain file monitoring
  * continuity across service interruptions. Key design purposes:
  *
  * <p>1. <b>Fast Service Restart</b> - Avoids full directory rescans by reloading previously saved
- *    snapshots containing file metadata (paths, sizes, timestamps).
+ * snapshots containing file metadata (paths, sizes, timestamps).
  *
  * <p>2. <b>Crash Resilience</b> - Preserves pre-crash state to detect changes occurred during
- *    service downtime through snapshot comparison during recovery.
+ * service downtime through snapshot comparison during recovery.
  *
-  * @author dukui
+ * @author dukui
  * @see FileSystemWatcher
  */
 public class LocalSnapshotStateRepository implements SnapshotStateRepository {
@@ -82,13 +83,13 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
 
         try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(storage,
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
-            
+
             oos.writeUTF(SERIALIZATION_VERSION);
-            
+
             Map<File, DirectorySnapshot> snapshots = (Map<File, DirectorySnapshot>) state;
-            
+
             oos.writeInt(snapshots.size());
-            
+
             for (Map.Entry<File, DirectorySnapshot> entry : snapshots.entrySet()) {
                 serializeDirectorySnapshot(oos, entry.getKey(), entry.getValue());
             }
@@ -97,29 +98,29 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
         }
     }
 
-     /*
-      * ┌─────────── RESTORE (Read Sequence) ───────────────┐
-      * │  ╭───────── Root Structure ────────╮              │
-      * │  │ 1. readUTF(Version Check)       │              │
-      * │  │ 2. readInt(Directory Count)     │              │
-      * │  ╰───────────┬─────────────────────╯              │
-      * │              │                                    │
-      * │              ▼                                    │
-      * │  ╭───────── Per Directory ─────────╮              │
-      * │  │ 3. readUTF(Directory Path)      │              │
-      * │  │ 4. readObject(Snapshot Time)    │              │
-      * │  │ 5. readInt(File Count)          │              │
-      * │  ╰───────────┬─────────────────────╯              │
-      * │              │                                    │
-      * │              ▼                                    │
-      * │  ╭───────── Per File ──────────────╮              │
-      * │  │ 6. readUTF(File Path)           │              │
-      * │  │ 7. readBoolean(Existence)       │              │
-      * │  │ 8. readLong(File Size)          │              │
-      * │  │ 9. readLong(Last Modified)      │              │
-      * │  ╰─────────────────────────────────╯              │
-      * └───────────────────────────────────────────────────┘
-      */
+    /*
+     * ┌─────────── RESTORE (Read Sequence) ───────────────┐
+     * │  ╭───────── Root Structure ────────╮              │
+     * │  │ 1. readUTF(Version Check)       │              │
+     * │  │ 2. readInt(Directory Count)     │              │
+     * │  ╰───────────┬─────────────────────╯              │
+     * │              │                                    │
+     * │              ▼                                    │
+     * │  ╭───────── Per Directory ─────────╮              │
+     * │  │ 3. readUTF(Directory Path)      │              │
+     * │  │ 4. readObject(Snapshot Time)    │              │
+     * │  │ 5. readInt(File Count)          │              │
+     * │  ╰───────────┬─────────────────────╯              │
+     * │              │                                    │
+     * │              ▼                                    │
+     * │  ╭───────── Per File ──────────────╮              │
+     * │  │ 6. readUTF(File Path)           │              │
+     * │  │ 7. readBoolean(Existence)       │              │
+     * │  │ 8. readLong(File Size)          │              │
+     * │  │ 9. readLong(Last Modified)      │              │
+     * │  ╰─────────────────────────────────╯              │
+     * └───────────────────────────────────────────────────┘
+     */
     @Override
     public synchronized Object restore() {
         if (!Files.exists(storage)) {
@@ -127,11 +128,13 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
             return null;
         }
 
+        if (storage.toFile().length() == 0) {
+            logger.info("The snapshot file is empty, which renders restoration unnecessary. However, an empty snapshot is considered invalid and may indicate potential issues");
+            return null;
+        }
+
         try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(storage, StandardOpenOption.READ))) {
             String serialVer = ois.readUTF();
-            if (!StringUtil.hasLength(serialVer)) {
-                logger.error("The snapshot file should not be created manually");
-            }
             if (!SERIALIZATION_VERSION.equals(serialVer)) {
                 logger.error("Failed to restore snapshot state due to a serialization version mismatch");
                 return null;
@@ -144,6 +147,13 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
                 snapshots.put(ds.getDirectory(), ds);
             }
             return snapshots;
+        } catch (EOFException | StreamCorruptedException e) {
+            logger.error("Corrupted snapshot detected. Deleting...");
+            try {
+                Files.delete(storage);
+            } catch (IOException ex) {
+                logger.error("Failed to delete corrupted snapshot file", ex);
+            }
         } catch (IOException | ClassNotFoundException e) {
             logger.error("Failed to restore snapshot state", e);
         }
@@ -152,11 +162,11 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
 
     private void serializeDirectorySnapshot(ObjectOutputStream oos, File directory, DirectorySnapshot snapshot) throws IOException {
         oos.writeUTF(directory.getAbsolutePath());
-        
+
         oos.writeObject(snapshot.getTime());
 
         oos.writeInt(snapshot.getFiles().size());
-        
+
         for (FileSnapshot file : snapshot.getFiles()) {
             oos.writeUTF(file.getFile().getAbsolutePath());
             oos.writeBoolean(file.exists());
@@ -168,10 +178,10 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
     private DirectorySnapshot deserializeDirectorySnapshot(ObjectInputStream ois) throws IOException, ClassNotFoundException {
         String dirPath = ois.readUTF();
         LocalDateTime time = (LocalDateTime) ois.readObject();
-        
+
         Set<FileSnapshot> files = new LinkedHashSet<>();
         int fileCount = ois.readInt();
-        
+
         for (int i = 0; i < fileCount; i++) {
             String filePath = ois.readUTF();
             boolean exists = ois.readBoolean();

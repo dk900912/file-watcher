@@ -3,9 +3,17 @@ package io.github.dk900912.filewatcher.filter;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import java.io.File;
-import static org.junit.jupiter.api.Assertions.*;
 import java.util.regex.PatternSyntaxException;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * @author dukui
+ */
 public class RegexFilterTest {
 
     private RegexFilter filter;
