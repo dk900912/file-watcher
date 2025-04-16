@@ -23,19 +23,19 @@ public class FileFilterFactory {
             logger.warn("FileWatcherProperties.acceptedStrategy is null or ANY, use AnyFilter");
             return new AnyFilter();
         }
-        Set<String> acceptedFilePatterns = fileWatcherProperties.getAcceptedFilePatterns();
-        if (acceptedFilePatterns == null || acceptedFilePatterns.isEmpty()) {
-            logger.warn("FileWatcherProperties.acceptedFilePatterns is null or empty when acceptedStrategy is SUFFIX or REGEX, use AnyFilter");
+        Set<String> acceptedStrategyPatterns = fileWatcherProperties.getAcceptedStrategyPatterns();
+        if (acceptedStrategyPatterns == null || acceptedStrategyPatterns.isEmpty()) {
+            logger.warn("FileWatcherProperties.acceptedStrategyPatterns is null or empty when acceptedStrategy is SUFFIX or REGEX, use AnyFilter");
             return new AnyFilter();
         }
         if (REGEX == acceptedStrategy) {
-            if (acceptedFilePatterns.size() > 1) {
-                logger.warn("FileWatcherProperties.acceptedFilePatterns should contain a single regex pattern when acceptedStrategy is REGEX. Only the first element will be utilized");
+            if (acceptedStrategyPatterns.size() > 1) {
+                logger.warn("FileWatcherProperties.acceptedStrategyPatterns should contain a single regex pattern when acceptedStrategy is REGEX. Only the first element will be utilized");
             }
             logger.info("FileWatcherProperties.acceptedStrategy is REGEX, use RegexFilter");
-            return new RegexFilter(acceptedFilePatterns.stream().findFirst().get());
+            return new RegexFilter(acceptedStrategyPatterns.stream().findFirst().get());
         }
         logger.info("FileWatcherProperties.acceptedStrategy is SUFFIX, use SuffixFilter");
-        return new SuffixFilter(acceptedFilePatterns);
+        return new SuffixFilter(acceptedStrategyPatterns);
     }
 }

@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.2</version>
+    <version>2.0.3</version>
 </dependency>
 ```
 # 3. 快速入门
@@ -29,18 +29,10 @@
 public class FileWatcherApplication {
    public static void main(String[] args) {
       FileWatcherProperties fileWatcherProperties = new FileWatcherProperties();
-      // 设置监听目录
-      fileWatcherProperties.setDirectories(Arrays.asList("目录1", "目录2"));
       FileSystemWatcher fileWatcher = new FileSystemWatcher(fileWatcherProperties);
-      // 注册文件变更监听器，可以自行实现更复杂的监听逻辑
-      // 默认监听目录下所有文件变更事件，并打印变更日志
       fileWatcher.addListener(new SimpleFileChangeListener());
-      // 仅仅监听 txt 文本文件的变更
       fileWatcher.setFileFilter(pathname -> pathname.getName().endsWith(".txt"));
-      // 启动监听
       fileWatcher.start();
-
-      for (; ;) {}
    }
 }
 ```
@@ -59,7 +51,7 @@ public class FileWatcherApplication {
 |--------------------------|--------|------------------------------------------|
 | directories              | null   | 监听目录列表，必须手动指定                            |
 | snapshotEnabled          | false  | 文件快照功能                                   |
-| acceptedStrategy         | MatchingType.ANY   | 文件匹配策略，默认为`AnyFilter`，即只要匹配到任何文件变更就触发监听器 |
+| acceptedStrategy         | MatchingStrategy.ANY   | 文件匹配策略，默认为`AnyFilter`，即只要匹配到任何文件变更就触发监听器 |
 | acceptedStrategyPatterns | null   | 详见`FileFilterFactory`                   |
 | pollInterval             | 1000ms | 完整扫描周期的时间间隔，控制整体扫描频率                                 |
 | quietPeriod              | 400ms  | 文件变动后的静默观察期，用于确认变更是否稳定完成                                 |
@@ -71,8 +63,8 @@ public class FileWatcherApplication {
 
 ## 5.1 关于文件监听范围
 
-默认监听目标目录下所有文件的变更事件。如果想要指定仅监听部分文件，目前支撑两种策略：
-1. `SUFFIX`：匹配文件后缀，可指定多中后缀，详见`SuffixFilter`;
+默认监听目标目录下所有文件的变更事件。如果想要指定仅监听部分文件，目前支持两种策略：
+1. `SUFFIX`：匹配文件后缀，可指定多种后缀，详见`SuffixFilter`;
 2. `REGEX`：匹配文件名正则表达式，但只能指定一个正则表达式Pattern，详见`RegexFilter`。
 
 ## 5.2 为什么设计文件快照
@@ -80,7 +72,7 @@ public class FileWatcherApplication {
 > 文件快照本质上是一种基于`ObjectOutputStream`序列化与反序列化的本地持久化机制。
 
 1. 如果监听应用退出后，在这期间（监听应用退出与监听应用重启之间）的文件变更事件是无法被监听到的；为了保持监听持续性，那么可以开启文件快照功能，默认关闭。
-2. 如果监听目录文件数量很大，无论是啥原因导致的重启监听应用，那么都会重新扫描整个目录，势必要消耗大量时间；为了减少扫描时间，可以开启文件快照功能，默认关闭。
+2. 如果监听目录文件数量很大，无论是啥原因导致的重启监听应用，那么都会重新扫描整个目录，势必要消耗一定时间；为了减少扫描时间，可以开启文件快照功能，默认关闭。
 
 ## 5.3 关于监听线程
 
@@ -120,7 +112,6 @@ do {
 > `FileWatcherProperties`由本组件定义，那么上层`Spring Boot`应用配置文件中所有以`file-watcher.`开头的相关配置项如何绑定到`FileWatcherProperties`实例中去呢？因为你无法在`FileWatcherProperties`头上追加`@ConfigurationProperties(prefix = "file-watcher")`注解。
 
 ```java
- @Order(Integer.MIN_VALUE + 100)
  @Bean
  public FileWatcherProperties fileWatcherProperties(ConfigurableEnvironment environment) {
      return Binder.get(environment)
@@ -134,23 +125,6 @@ do {
 > 如何在`Spring Boot`启动时自动调用其`start`方法，在退出时自动调用其`stop`方法？答案是自行实现`SmartLifecycle`接口。
 
 ```java
-package io.github.dk900912.smartcontent.generator.factorybean;
-
-import io.github.dk900912.filewatcher.FileSystemWatcher;
-import io.github.dk900912.filewatcher.FileWatcherProperties;
-import io.github.dk900912.smartcontent.generator.listener.ImageListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.SmartLifecycle;
-import org.springframework.lang.NonNull;
-
-import java.io.FileFilter;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 public class FileSystemWatcherFactoryBean implements
         FactoryBean<FileSystemWatcher>, SmartLifecycle, ApplicationContextAware {
 

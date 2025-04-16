@@ -83,7 +83,7 @@ public class FileWatcherProperties {
         this.acceptedStrategy = acceptedStrategy;
     }
 
-    public Set<String> getAcceptedFilePatterns() {
+    public Set<String> getAcceptedStrategyPatterns() {
         return acceptedStrategyPatterns;
     }
 

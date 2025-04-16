@@ -68,6 +68,7 @@ public class LocalSnapshotStateRepositoryTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void testSaveAndRestoreConsistency() {
         Map<File, DirectorySnapshot> original = createSnapshotMap();
 
