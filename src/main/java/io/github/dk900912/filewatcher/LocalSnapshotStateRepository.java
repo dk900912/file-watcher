@@ -15,12 +15,16 @@ import java.io.StreamCorruptedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 /**
  * Persistent repository for storing/restoring directory snapshots to maintain file monitoring
@@ -81,8 +85,7 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
             return;
         }
 
-        try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(storage,
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
+        try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(storage, CREATE, WRITE, TRUNCATE_EXISTING))) {
 
             oos.writeUTF(SERIALIZATION_VERSION);
 
@@ -133,7 +136,7 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
             return null;
         }
 
-        try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(storage, StandardOpenOption.READ))) {
+        try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(storage, READ))) {
             String serialVer = ois.readUTF();
             if (!SERIALIZATION_VERSION.equals(serialVer)) {
                 logger.error("Failed to restore snapshot state due to a serialization version mismatch");

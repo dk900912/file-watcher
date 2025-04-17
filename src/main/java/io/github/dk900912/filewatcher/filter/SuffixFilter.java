@@ -15,7 +15,7 @@ public class SuffixFilter implements FileFilter {
     private final Set<String> suffixes;
 
     public SuffixFilter(Set<String> suffixes) {
-        Assert.state(suffixes != null && !suffixes.isEmpty(), "Suffixes must not be empty");
+        Assert.isTrue(suffixes != null && !suffixes.isEmpty(), "Suffixes must not be empty");
         this.suffixes = new LinkedHashSet<>(suffixes);
     }
 

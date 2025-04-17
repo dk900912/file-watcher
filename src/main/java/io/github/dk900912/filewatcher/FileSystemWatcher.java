@@ -1,5 +1,6 @@
 package io.github.dk900912.filewatcher;
 
+import io.github.dk900912.filewatcher.filter.FileFilterFactory;
 import io.github.dk900912.filewatcher.listener.FileChangeListener;
 import io.github.dk900912.filewatcher.model.ChangedFiles;
 import io.github.dk900912.filewatcher.model.DirectorySnapshot;
@@ -43,16 +44,14 @@ public class FileSystemWatcher {
 
     public FileSystemWatcher(FileWatcherProperties properties) {
         Assert.notNull(properties, "FileWatcherProperties must not be null");
-        Assert.state(properties.getDirectories() != null && !properties.getDirectories().isEmpty(),
-                "FileWatcherProperties.directories must not be null or empty");
+        Assert.isTrue(properties.getDirectories() != null && !properties.getDirectories().isEmpty(),
+                "FileWatcherProperties.directories must not be empty");
         this.properties = properties;
-        this.properties.getDirectories()
-                .stream()
-                .map(File::new)
-                .forEach(dir -> {
-                    Assert.isTrue(dir.isDirectory(), () -> "Directory '" + dir + "' must be a directory");
-                    this.directories.put(dir, null);
-                });
+        for (String s : properties.getDirectories()) {
+            File dir = new File(s);
+            this.directories.put(dir, null);
+        }
+        this.fileFilter = FileFilterFactory.create(this.properties);
         this.snapshotStateRepository = properties.getSnapshotEnabled() ? SnapshotStateRepository.LOCAL : SnapshotStateRepository.NONE;
     }
 
@@ -64,7 +63,13 @@ public class FileSystemWatcher {
         }
     }
 
-    public void setFileFilter(FileFilter fileFilter) {
+    /**
+     * Typically, there is no need to replace the file filter, as a default {@link FileFilter}
+     * is automatically provided based on the configuration in {@link FileWatcherProperties}.
+     *
+     * @param fileFilter the new {@link FileFilter} instance to set
+     */
+    public void replaceFileFilter(FileFilter fileFilter) {
         synchronized (this.monitor) {
             this.fileFilter = fileFilter;
         }

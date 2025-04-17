@@ -19,14 +19,14 @@ public class FileSnapshotTest {
 
     @BeforeAll
     static void setup() throws IOException {
-        // 1. Create test file before all tests
+        // 1. Create a test file before all tests
         Path path = Files.createTempFile(TEST_FILE_NAME, null);
         testFile = path.toFile();
     }
 
     @AfterAll
     static void cleanup() {
-        // 2. Delete test file after all tests
+        // 2. Delete a test file after all tests
         if (testFile != null && testFile.exists()) {
             Assert.isTrue(testFile.delete(), "Failed to delete test file");
         }

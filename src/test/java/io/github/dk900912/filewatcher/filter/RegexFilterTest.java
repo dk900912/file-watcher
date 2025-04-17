@@ -1,10 +1,11 @@
 package io.github.dk900912.filewatcher.filter;
 
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.PatternSyntaxException;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,7 +21,9 @@ public class RegexFilterTest {
 
     @BeforeEach
     public void setUp() {
-        filter = new RegexFilter(".*\\.txt");
+        Set<String> regexes = new HashSet<>();
+        regexes.add(".*\\.txt");
+        filter = new RegexFilter(regexes);
     }
 
     @Test
@@ -42,12 +45,15 @@ public class RegexFilterTest {
     }
 
     @Test
-    public void accept_EmptyRegex_ThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> new RegexFilter(""));
+    public void accept_InvalidRegex_ThrowsPatternSyntaxException() {
+        Set<String> invalidRegexes = new HashSet<>();
+        invalidRegexes.add("[");
+        assertThrows(PatternSyntaxException.class, () -> new RegexFilter(invalidRegexes));
     }
 
     @Test
-    public void accept_InvalidRegex_ThrowsPatternSyntaxException() {
-        assertThrows(PatternSyntaxException.class, () -> new RegexFilter("["));
+    public void accept_EmptyRegexCollection_ThrowsIllegalStateException() {
+        Set<String> emptyRegexes = new HashSet<>();
+        assertThrows(IllegalArgumentException.class, () -> new RegexFilter(emptyRegexes));
     }
 }
