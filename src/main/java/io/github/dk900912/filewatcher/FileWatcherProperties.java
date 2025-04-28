@@ -8,7 +8,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
@@ -25,7 +24,7 @@ public class FileWatcherProperties {
     private String name = "File Watcher";
 
     // Scan forever by default
-    private AtomicInteger remainingScans = new AtomicInteger(-1);
+    private Integer remainingScans = -1;
 
     private Boolean snapshotEnabled = false;
 
@@ -53,11 +52,12 @@ public class FileWatcherProperties {
         this.name = name;
     }
 
-    public AtomicInteger getRemainingScans() {
+    public Integer getRemainingScans() {
         return remainingScans;
     }
 
-    public void setRemainingScans(AtomicInteger remainingScans) {
+    public void setRemainingScans(Integer remainingScans) {
+        Assert.isTrue(remainingScans > 0 || remainingScans == -1, "RemainingScans must be positive or -1");
         this.remainingScans = remainingScans;
     }
 

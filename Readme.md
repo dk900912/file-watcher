@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.4</version>
+    <version>2.0.5</version>
 </dependency>
 ```
 # 3. 快速入门
@@ -47,16 +47,16 @@ public class FileWatcherApplication {
 
 主要配置项均由`FileWatcherProperties`承载，默认配置如下：
 
-| 配置项                      | 默认值                   | 说明                                                   |
-|--------------------------|-----------------------|------------------------------------------------------|
-| directories              | null                  | 监听目录列表，必须手动指定                                        |
-| snapshotEnabled          | false                 | 文件快照功能                                               |
-| acceptedStrategy         | null                  | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器 |
-| pollInterval             | 1000ms                | 完整扫描周期的时间间隔，控制整体扫描频率                                 |
-| quietPeriod              | 400ms                 | 文件变动后的静默观察期，用于确认变更是否稳定完成                             |
-| daemon                   | true                  | 监听线程是否为守护线程                                          |
-| name                     | "File Watcher"        | 监听线程名称                                               |
-| remainingScans           | new AtomicInteger(-1) | 监听线程扫描文件目录的剩余次数，默认持续扫描                               |
+| 配置项                      | 默认值                  | 说明                                                             |
+|--------------------------|----------------------|----------------------------------------------------------------|
+| directories              | null                 | 监听目录列表，必须手动指定                                                  |
+| snapshotEnabled          | false                | 文件快照功能                                                         |
+| acceptedStrategy         | null                 | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器           |
+| pollInterval             | 1000ms               | 完整扫描周期的时间间隔，控制整体扫描频率                                           |
+| quietPeriod              | 400ms                | 文件变动后的静默观察期，用于确认变更是否稳定完成                                       |
+| daemon                   | true                 | 监听线程是否为守护线程                                                    |
+| name                     | "File Watcher"       | 监听线程名称                                                         |
+| remainingScans           | -1 | 监听线程扫描文件目录的剩余次数，默认持续扫描；假设指定其为3，那么在`File Watcher`线程完成3次后就会自动退出。 |
 
 # 5. 进阶
 
@@ -90,6 +90,24 @@ public class FileWatcherApplication {
 
 1. 如果监听应用退出后，在这期间（监听应用退出与监听应用重启之间）的文件变更事件是无法被监听到的；为了保持监听持续性，那么可以开启文件快照功能，默认关闭。
 2. 如果监听目录文件数量很大，无论是啥原因导致的重启监听应用，那么都会重新扫描整个目录，势必要消耗一定时间；为了减少扫描时间，可以开启文件快照功能，默认关闭。
+
+如果上述策略不满足需求，那么可以自行实现`SnapshotStateRepository`接口，最后通过`FileSystemWatcher`的`replaceSnapshotStateRepository()`方法来替换默认生成的`SnapshotStateRepository`，这同样是最大的自由度。
+
+```java
+ /**
+  * Typically, there is no need to replace the snapshot state repository, as a default
+  * {@link SnapshotStateRepository} is automatically provided based on the configuration
+  * in {@link FileWatcherProperties}.
+  *
+  * @param snapshotStateRepository the new {@link SnapshotStateRepository} instance to set
+  */
+ public void replaceSnapshotStateRepository(SnapshotStateRepository snapshotStateRepository) {
+     Assert.notNull(snapshotStateRepository, "SnapshotStateRepository must not be null");
+     synchronized (this.monitor) {
+         this.snapshotStateRepository = snapshotStateRepository;
+     }
+ }
+```
 
 ## 5.3 关于监听线程
 
@@ -154,11 +172,9 @@ public class FileSystemWatcherFactoryBean implements
     @Override
     public FileSystemWatcher getObject() throws Exception {
         ImageListener imageListener = applicationContext.getBean(ImageListener.class);
-        FileFilter imageFilter = applicationContext.getBean(FileFilter.class);
         FileWatcherProperties fileWatcherProperties = applicationContext.getBean(FileWatcherProperties.class);
         final FileSystemWatcher fileSystemWatcher = new FileSystemWatcher(fileWatcherProperties);
         fileSystemWatcher.addListener(imageListener);
-        fileSystemWatcher.setFileFilter(imageFilter);
         return fileSystemWatcher;
     }
 

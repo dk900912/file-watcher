@@ -33,7 +33,7 @@ public class FileWatcherPropertiesTest {
     void testDefaultValues() {
         assertTrue(properties.getDaemon());
         assertEquals("File Watcher", properties.getName());
-        assertEquals(-1, properties.getRemainingScans().get());
+        assertEquals(-1, properties.getRemainingScans());
         assertFalse(properties.getSnapshotEnabled());
         assertNull(properties.getDirectories());
         assertNull(properties.getAcceptedStrategy());

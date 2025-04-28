@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,29 +25,62 @@ import java.util.concurrent.atomic.AtomicInteger;
  * is thread-safe, it is recommended to maintain a single instance to avoid redundant
  * resource utilization.
  *
+ * <p>
+ * Typical usage for component consumers:
+ * <ol>
+ *   <li>Construct instance with {@link #FileSystemWatcher(FileWatcherProperties)}</li>
+ *   <li>Register listeners via {@link #addListener(FileChangeListener)}</li>
+ *   <li>Start monitoring with {@link #start()}</li>
+ *   <li>Stop monitoring with {@link #stop()} when finished</li>
+ * </ol>
+ * <p>
+ * Other methods are primarily provided for advanced customization or framework extension:
+ * <ol>
+ *     <li>{@link #replaceFileFilter(FileFilter)}</li>
+ *     <li>{@link #replaceSnapshotStateRepository(SnapshotStateRepository)}</li>
+ * </ol>
+ *
  * @author dukui
  */
 public class FileSystemWatcher {
 
-    private final List<FileChangeListener> listeners = new ArrayList<>();
+    private final Object monitor = new Object();
 
-    private final SnapshotStateRepository snapshotStateRepository;
+    private final List<FileChangeListener> listeners = new ArrayList<>();
 
     private final Map<File, DirectorySnapshot> directories = new HashMap<>();
 
     private final FileWatcherProperties properties;
 
+    /*
+     * Holds remaining scan count as AtomicInteger for runtime modification.
+     * <p>
+     * Why not use AtomicInteger in FileWatcherProperties?
+     * 1. Spring Boot's relaxed binding requires an Integer type for configuration properties
+     *    (AtomicInteger conversion isn't supported out-of-box)
+     * 2. FileWatcherProperties should maintain configuration immutability after binding
+     *
+     * *********************************************************************************
+     * Property: file-watcher.remaining-scans
+     * Value: "5"
+     * Origin: class path resource [application.properties] - 37:30
+     * Reason: failed to convert java.lang.String to java.util.concurrent.atomic.AtomicInteger
+     * *********************************************************************************
+     */
+    private final AtomicInteger remainingScans;
+
     private Thread watchThread;
 
     private FileFilter fileFilter;
 
-    private final Object monitor = new Object();
+    private SnapshotStateRepository snapshotStateRepository;
 
     public FileSystemWatcher(FileWatcherProperties properties) {
         Assert.notNull(properties, "FileWatcherProperties must not be null");
         Assert.isTrue(properties.getDirectories() != null && !properties.getDirectories().isEmpty(),
                 "FileWatcherProperties.directories must not be empty");
         this.properties = properties;
+        this.remainingScans = new AtomicInteger(Optional.ofNullable(properties.getRemainingScans()).orElse(-1));
         for (String s : properties.getDirectories()) {
             File dir = new File(s);
             this.directories.put(dir, null);
@@ -70,8 +104,23 @@ public class FileSystemWatcher {
      * @param fileFilter the new {@link FileFilter} instance to set
      */
     public void replaceFileFilter(FileFilter fileFilter) {
+        Assert.notNull(fileFilter, "FileFilter must not be null");
         synchronized (this.monitor) {
             this.fileFilter = fileFilter;
+        }
+    }
+
+    /**
+     * Typically, there is no need to replace the snapshot state repository, as a default
+     * {@link SnapshotStateRepository} is automatically provided based on the configuration
+     * in {@link FileWatcherProperties}.
+     *
+     * @param snapshotStateRepository the new {@link SnapshotStateRepository} instance to set
+     */
+    public void replaceSnapshotStateRepository(SnapshotStateRepository snapshotStateRepository) {
+        Assert.notNull(snapshotStateRepository, "SnapshotStateRepository must not be null");
+        synchronized (this.monitor) {
+            this.snapshotStateRepository = snapshotStateRepository;
         }
     }
 
@@ -89,7 +138,7 @@ public class FileSystemWatcher {
             createOrRestoreInitialSnapshots();
             if (this.watchThread == null) {
                 Map<File, DirectorySnapshot> localDirectories = new HashMap<>(this.directories);
-                Watcher watcher = new Watcher(this.properties.getRemainingScans(), new ArrayList<>(this.listeners), this.fileFilter,
+                Watcher watcher = new Watcher(this.remainingScans, new ArrayList<>(this.listeners), this.fileFilter,
                         this.properties.getPollInterval().toMillis(), this.properties.getQuietPeriod().toMillis(),
                         localDirectories, this.snapshotStateRepository);
                 this.watchThread = new Thread(watcher);
@@ -126,7 +175,7 @@ public class FileSystemWatcher {
         synchronized (this.monitor) {
             thread = this.watchThread;
             if (thread != null) {
-                this.properties.getRemainingScans().set(remainingScans);
+                this.remainingScans.set(remainingScans);
                 if (remainingScans <= 0) {
                     thread.interrupt();
                 }
