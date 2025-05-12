@@ -1,6 +1,7 @@
-package io.github.dk900912.filewatcher.model;
+package io.github.dk900912.filewatcher;
 
-import io.github.dk900912.filewatcher.LocalSnapshotStateRepository;
+import io.github.dk900912.filewatcher.model.DirectorySnapshot;
+import io.github.dk900912.filewatcher.model.FileSnapshot;
 import io.github.dk900912.filewatcher.utils.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

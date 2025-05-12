@@ -20,7 +20,7 @@ public class SimpleFileChangeListener implements FileChangeListener {
     public void onChange(Set<ChangedFiles> changeSet) {
         for (ChangedFiles changedFiles : changeSet) {
             for (ChangedFile changedFile : changedFiles) {
-                logger.info("0=={======> {} <======}==0", changedFile);
+                logger.info("o=={======> {} <======}==o", changedFile);
             }
         }
     }

@@ -2,12 +2,15 @@ package io.github.dk900912.filewatcher;
 
 import io.github.dk900912.filewatcher.filter.MatchingStrategy;
 import io.github.dk900912.filewatcher.utils.Assert;
+import io.github.dk900912.filewatcher.utils.StringUtil;
 
 import java.io.File;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
@@ -17,63 +20,82 @@ import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
  */
 public class FileWatcherProperties {
 
-    // Daemon thread by default
-    private Boolean daemon = true;
+    private static final Boolean DEFAULT_DAEMON = true;
 
-    // Thread name by default
-    private String name = "File Watcher";
+    private static final String DEFAULT_NAME = "File Watcher";
+
+    private static final Boolean DEFAULT_SNAPSHOT_ENABLED = false;
+
+    private static final Map<MatchingStrategy, Set<String>> DEFAULT_ACCEPTED_STRATEGY = Map.of(ANY, Set.of());
 
     // Scan forever by default
-    private Integer remainingScans = -1;
+    private static final Integer DEFAULT_REMAINING_SCANS = -1;
 
-    private Boolean snapshotEnabled = false;
+    private static final Duration DEFAULT_POLL_INTERVAL = Duration.ofMillis(1000);
 
-    private List<String> directories;
+    private static final Duration DEFAULT_QUIET_PERIOD = Duration.ofMillis(400);
 
-    private Map<MatchingStrategy, Set<String>> acceptedStrategy;
+    // Immutable at runtime
+    private final Boolean daemon;
 
-    private Duration pollInterval = Duration.ofMillis(1000);
+    // Immutable at runtime
+    private final String name;
 
-    private Duration quietPeriod = Duration.ofMillis(400);
+    // Immutable at runtime
+    private final List<String> directories;
 
-    public Boolean getDaemon() {
-        return daemon;
+    // Immutable at runtime
+    private final Map<MatchingStrategy, Set<String>> acceptedStrategy;
+
+    // Immutable at runtime
+    private final Boolean snapshotEnabled;
+
+    // Mutable value at runtime
+    private final AtomicInteger remainingScans = new AtomicInteger(DEFAULT_REMAINING_SCANS);
+
+    // Mutable value at runtime
+    private final AtomicReference<Duration> pollInterval = new AtomicReference<>(DEFAULT_POLL_INTERVAL);
+
+    // Mutable value at runtime
+    private final AtomicReference<Duration> quietPeriod = new AtomicReference<>(DEFAULT_QUIET_PERIOD);
+
+    public FileWatcherProperties(List<String> directories) {
+        this(
+            DEFAULT_DAEMON,
+            DEFAULT_NAME,
+            directories,
+            DEFAULT_ACCEPTED_STRATEGY,
+            DEFAULT_SNAPSHOT_ENABLED,
+            DEFAULT_REMAINING_SCANS,
+            DEFAULT_POLL_INTERVAL,
+            DEFAULT_QUIET_PERIOD
+        );
     }
 
-    public void setDaemon(Boolean daemon) {
-        this.daemon = daemon;
+    public FileWatcherProperties(List<String> directories, Map<MatchingStrategy, Set<String>> acceptedStrategy) {
+        this(
+            DEFAULT_DAEMON,
+            DEFAULT_NAME,
+            directories,
+            acceptedStrategy,
+            DEFAULT_SNAPSHOT_ENABLED,
+            DEFAULT_REMAINING_SCANS,
+            DEFAULT_POLL_INTERVAL,
+            DEFAULT_QUIET_PERIOD
+        );
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Integer getRemainingScans() {
-        return remainingScans;
-    }
-
-    public void setRemainingScans(Integer remainingScans) {
-        Assert.isTrue(remainingScans > 0 || remainingScans == -1, "RemainingScans must be positive or -1");
-        this.remainingScans = remainingScans;
-    }
-
-    public Boolean getSnapshotEnabled() {
-        return snapshotEnabled;
-    }
-
-    public void setSnapshotEnabled(Boolean snapshotEnabled) {
-        this.snapshotEnabled = snapshotEnabled;
-    }
-
-    public List<String> getDirectories() {
-        return directories;
-    }
-
-    public void setDirectories(List<String> directories) {
+    public FileWatcherProperties(Boolean daemon,
+                                 String name,
+                                 List<String> directories,
+                                 Map<MatchingStrategy, Set<String>> acceptedStrategy,
+                                 Boolean snapshotEnabled,
+                                 Integer remainingScans,
+                                 Duration pollInterval,
+                                 Duration quietPeriod) {
+        this.daemon = daemon == null ? DEFAULT_DAEMON : daemon;
+        this.name = !StringUtil.hasLength(name) ? DEFAULT_NAME : name;
+        // Validate directories
         Assert.isTrue(directories != null && !directories.isEmpty(), "Directories must not be null or empty");
         this.directories = directories.stream()
                 .map(String::trim)
@@ -83,58 +105,86 @@ public class FileWatcherProperties {
                     Assert.isTrue(dir.isDirectory(), () -> "Directory '" + dir + "' must be a directory");
                 })
                 .toList();
+        // Validate acceptedStrategy
+        if (acceptedStrategy == null) {
+            this.acceptedStrategy = DEFAULT_ACCEPTED_STRATEGY;
+        } else {
+            Assert.isTrue(!acceptedStrategy.isEmpty(), "AcceptedStrategy must not be empty");
+            boolean onlyAny = acceptedStrategy.keySet().stream().allMatch(ANY::equals);
+            if (!onlyAny) {
+                Map<MatchingStrategy, Set<String>> filteredStrategy = acceptedStrategy.entrySet().stream()
+                        .filter(entry -> !ANY.equals(entry.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                Assert.isTrue(filteredStrategy.size() == 1,
+                        "AcceptedStrategy must contain exactly one key after filtering out ANY");
+                Assert.isTrue(filteredStrategy.values().stream().noneMatch(Set::isEmpty),
+                        "AcceptedStrategy must contain non-empty value for the key");
+                this.acceptedStrategy = filteredStrategy;
+            } else {
+                this.acceptedStrategy = DEFAULT_ACCEPTED_STRATEGY;
+            }
+        }
+        this.snapshotEnabled = snapshotEnabled == null ? DEFAULT_SNAPSHOT_ENABLED : snapshotEnabled;
+
+        // Validate remainingScans
+        Assert.isTrue(remainingScans > 0 || remainingScans == -1, "RemainingScans must be positive or -1");
+        this.remainingScans.set(remainingScans);
+
+        // Validate pollInterval & quietPeriod
+        Assert.isTrue(pollInterval.toMillis() > 0, "PollInterval must be positive");
+        Assert.isTrue(quietPeriod.toMillis() > 0, "QuietPeriod must be positive");
+        Assert.isTrue(pollInterval.toMillis() > quietPeriod.toMillis(), "PollInterval must be greater than QuietPeriod");
+        this.pollInterval.set(pollInterval);
+        this.quietPeriod.set(quietPeriod);
+    }
+
+    public Boolean getDaemon() {
+        return this.daemon;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public List<String> getDirectories() {
+        return this.directories;
     }
 
     public Map<MatchingStrategy, Set<String>> getAcceptedStrategy() {
-        return acceptedStrategy;
+        return this.acceptedStrategy;
     }
 
-    /**
-     * Sets the accepted strategy for file matching.
-     * If the accepted strategy contains the {@link io.github.dk900912.filewatcher.filter.MatchingStrategy#ANY} key,
-     * it will be filtered out first. After filtering, the accepted strategy must contain exactly one key, and the
-     * corresponding value must not be empty.
-     *
-     * @param acceptedStrategy the accepted strategy map
-     * @throws IllegalArgumentException if the accepted strategy is null, empty, contains more than one key after filtering,
-     *                                  or the value for the key is empty
-     */
-    public void setAcceptedStrategy(Map<MatchingStrategy, Set<String>> acceptedStrategy) {
-        Assert.isTrue(acceptedStrategy != null && !acceptedStrategy.isEmpty(),
-                "AcceptedStrategy must not be null or empty");
-        boolean onlyAny = acceptedStrategy.keySet().stream().allMatch(ANY::equals);
-        if (!onlyAny) {
-            Map<MatchingStrategy, Set<String>> filteredStrategy = acceptedStrategy.entrySet().stream()
-                    .filter(entry -> !ANY.equals(entry.getKey()))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            Assert.isTrue(filteredStrategy.size() == 1,
-                    "AcceptedStrategy must contain exactly one key after filtering out ANY");
-            Assert.isTrue(filteredStrategy.values().stream().noneMatch(Set::isEmpty),
-                    "AcceptedStrategy must contain non-empty value for the key");
-            this.acceptedStrategy = filteredStrategy;
-        } else {
-            this.acceptedStrategy = acceptedStrategy;
+    public Boolean getSnapshotEnabled() {
+        return this.snapshotEnabled;
+    }
+
+    public AtomicInteger getRemainingScans() {
+        return this.remainingScans;
+    }
+
+    public void setRemainingScans(Integer remainingScans) {
+        if (remainingScans > 0 || remainingScans == -1) {
+            this.remainingScans.set(remainingScans);
         }
     }
 
-    public Duration getPollInterval() {
-        return pollInterval;
+    public AtomicReference<Duration> getPollInterval() {
+        return this.pollInterval;
     }
 
     public void setPollInterval(Duration pollInterval) {
-        Assert.isTrue(pollInterval.toMillis() > 0, "PollInterval must be positive");
-        Assert.isTrue(pollInterval.toMillis() > getQuietPeriod().toMillis(), "PollInterval must be greater than QuietPeriod");
-        this.pollInterval = pollInterval;
+        if (pollInterval.toMillis() > 0 && pollInterval.toMillis() > getQuietPeriod().get().toMillis()) {
+            this.pollInterval.set(pollInterval);
+        }
     }
 
-    public Duration getQuietPeriod() {
-        return quietPeriod;
+    public AtomicReference<Duration> getQuietPeriod() {
+        return this.quietPeriod;
     }
 
     public void setQuietPeriod(Duration quietPeriod) {
-        Assert.isTrue(quietPeriod.toMillis() > 0, "QuietPeriod must be positive");
-        Assert.isTrue(getPollInterval().toMillis() > quietPeriod.toMillis(), "PollInterval must be greater than QuietPeriod");
-        this.quietPeriod = quietPeriod;
+        if (quietPeriod.toMillis() > 0 && getPollInterval().get().toMillis() > quietPeriod.toMillis()) {
+            this.quietPeriod.set(quietPeriod);
+        }
     }
 }
-

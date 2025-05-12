@@ -5,9 +5,12 @@ import io.github.dk900912.filewatcher.listener.FileChangeListener;
 import io.github.dk900912.filewatcher.model.ChangedFiles;
 import io.github.dk900912.filewatcher.model.DirectorySnapshot;
 import io.github.dk900912.filewatcher.utils.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,14 +19,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Monitors designated directories for file system events and changes. While this class
- * is thread-safe, it is recommended to maintain a single instance to avoid redundant
- * resource utilization.
+ * While this class is thread-safe, it is recommended to maintain a single instance to avoid redundant resource utilization.
  *
  * <p>
  * Typical usage for component consumers:
@@ -44,6 +45,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class FileSystemWatcher {
 
+    private static final Logger logger = LoggerFactory.getLogger(FileSystemWatcher.class);
+
     private final Object monitor = new Object();
 
     private final List<FileChangeListener> listeners = new ArrayList<>();
@@ -51,23 +54,6 @@ public class FileSystemWatcher {
     private final Map<File, DirectorySnapshot> directories = new HashMap<>();
 
     private final FileWatcherProperties properties;
-
-    /*
-     * Holds remaining scan count as AtomicInteger for runtime modification.
-     * <p>
-     * Why not use AtomicInteger in FileWatcherProperties?
-     * 1. Spring Boot's relaxed binding requires an Integer type for configuration properties
-     *    (AtomicInteger conversion isn't supported out-of-box)
-     * 2. FileWatcherProperties should maintain configuration immutability after binding
-     *
-     * *********************************************************************************
-     * Property: file-watcher.remaining-scans
-     * Value: "5"
-     * Origin: class path resource [application.properties] - 37:30
-     * Reason: failed to convert java.lang.String to java.util.concurrent.atomic.AtomicInteger
-     * *********************************************************************************
-     */
-    private final AtomicInteger remainingScans;
 
     private Thread watchThread;
 
@@ -80,7 +66,6 @@ public class FileSystemWatcher {
         Assert.isTrue(properties.getDirectories() != null && !properties.getDirectories().isEmpty(),
                 "FileWatcherProperties.directories must not be empty");
         this.properties = properties;
-        this.remainingScans = new AtomicInteger(Optional.ofNullable(properties.getRemainingScans()).orElse(-1));
         for (String s : properties.getDirectories()) {
             File dir = new File(s);
             this.directories.put(dir, null);
@@ -138,8 +123,8 @@ public class FileSystemWatcher {
             createOrRestoreInitialSnapshots();
             if (this.watchThread == null) {
                 Map<File, DirectorySnapshot> localDirectories = new HashMap<>(this.directories);
-                Watcher watcher = new Watcher(this.remainingScans, new ArrayList<>(this.listeners), this.fileFilter,
-                        this.properties.getPollInterval().toMillis(), this.properties.getQuietPeriod().toMillis(),
+                Watcher watcher = new Watcher(this.properties.getRemainingScans(), new ArrayList<>(this.listeners), this.fileFilter,
+                        this.properties.getPollInterval(), this.properties.getQuietPeriod(),
                         localDirectories, this.snapshotStateRepository);
                 this.watchThread = new Thread(watcher);
                 this.watchThread.setName(this.properties.getName());
@@ -175,7 +160,7 @@ public class FileSystemWatcher {
         synchronized (this.monitor) {
             thread = this.watchThread;
             if (thread != null) {
-                this.remainingScans.set(remainingScans);
+                this.properties.getRemainingScans().set(remainingScans);
                 if (remainingScans <= 0) {
                     thread.interrupt();
                 }
@@ -199,16 +184,20 @@ public class FileSystemWatcher {
 
         private final FileFilter fileFilter;
 
-        private final long pollInterval;
+        private final AtomicReference<Duration> pollInterval;
 
-        private final long quietPeriod;
+        private final AtomicReference<Duration> quietPeriod;
 
         private Map<File, DirectorySnapshot> directories;
 
         private final SnapshotStateRepository snapshotStateRepository;
 
-        private Watcher(AtomicInteger remainingScans, List<FileChangeListener> listeners, FileFilter fileFilter,
-                        long pollInterval, long quietPeriod, Map<File, DirectorySnapshot> directories,
+        private Watcher(AtomicInteger remainingScans,
+                        List<FileChangeListener> listeners,
+                        FileFilter fileFilter,
+                        AtomicReference<Duration> pollInterval,
+                        AtomicReference<Duration> quietPeriod,
+                        Map<File, DirectorySnapshot> directories,
                         SnapshotStateRepository snapshotStateRepository) {
             this.remainingScans = remainingScans;
             this.listeners = listeners;
@@ -223,6 +212,9 @@ public class FileSystemWatcher {
         public void run() {
             int remainingScans = this.remainingScans.get();
             while (remainingScans > 0 || remainingScans == -1) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("o=={======> Starting directory scan for file changes. remaining-scans:{}, pool-intervals:{}ms, quiet-period:{}ms", remainingScans, this.pollInterval.get().toMillis(), this.quietPeriod.get().toMillis());
+                }
                 try {
                     if (remainingScans > 0) {
                         this.remainingScans.decrementAndGet();
@@ -236,13 +228,13 @@ public class FileSystemWatcher {
         }
 
         private void scan() throws InterruptedException {
-            Thread.sleep(this.pollInterval - this.quietPeriod);
+            Thread.sleep(this.pollInterval.get().toMillis() - this.quietPeriod.get().toMillis());
             Map<File, DirectorySnapshot> previous;
             Map<File, DirectorySnapshot> current = this.directories;
             do {
                 previous = current;
                 current = getCurrentSnapshots();
-                Thread.sleep(this.quietPeriod);
+                Thread.sleep(this.quietPeriod.get().toMillis());
             } while (isDifferent(previous, current));
             if (isDifferent(this.directories, current)) {
                 updateSnapshots(current.values());

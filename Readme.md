@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.5</version>
+    <version>2.0.6</version>
 </dependency>
 ```
 # 3. 快速入门
@@ -28,8 +28,7 @@
 ```java
 public class FileWatcherApplication {
    public static void main(String[] args) {
-      FileWatcherProperties fileWatcherProperties = new FileWatcherProperties();
-      fileWatcherProperties.setDirectories(Arrays.asList("目录1", "目录2"));
+      FileWatcherProperties fileWatcherProperties = new FileWatcherProperties(Arrays.asList("目录1", "目录2"));
       FileSystemWatcher fileWatcher = new FileSystemWatcher(fileWatcherProperties);
       fileWatcher.addListener(new SimpleFileChangeListener());
       fileWatcher.start();
@@ -47,16 +46,16 @@ public class FileWatcherApplication {
 
 主要配置项均由`FileWatcherProperties`承载，默认配置如下：
 
-| 配置项                      | 默认值                  | 说明                                                             |
-|--------------------------|----------------------|----------------------------------------------------------------|
-| directories              | null                 | 监听目录列表，必须手动指定                                                  |
-| snapshotEnabled          | false                | 文件快照功能                                                         |
-| acceptedStrategy         | null                 | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器           |
-| pollInterval             | 1000ms               | 完整扫描周期的时间间隔，控制整体扫描频率                                           |
-| quietPeriod              | 400ms                | 文件变动后的静默观察期，用于确认变更是否稳定完成                                       |
-| daemon                   | true                 | 监听线程是否为守护线程                                                    |
-| name                     | "File Watcher"       | 监听线程名称                                                         |
-| remainingScans           | -1 | 监听线程扫描文件目录的剩余次数，默认持续扫描；假设指定其为3，那么在`File Watcher`线程完成3次后就会自动退出。 |
+| 配置项                      | 默认值                  | 说明                                                             | 运行时是否可变 |
+|--------------------------|----------------------|----------------------------------------------------------------|---------|
+| directories              | null                 | 监听目录列表，必须手动指定                                                  | 否       |
+| snapshotEnabled          | false                | 文件快照功能                                                         | 否       |
+| acceptedStrategy         | null                 | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器           | 否       |
+| pollInterval             | 1000ms               | 完整扫描周期的时间间隔，控制整体扫描频率                                           | 是       |
+| quietPeriod              | 400ms                | 文件变动后的静默观察期，用于确认变更是否稳定完成                                       | 是       |
+| daemon                   | true                 | 监听线程是否为守护线程                                                    | 否       |
+| name                     | "File Watcher"       | 监听线程名称                                                         | 否       |
+| remainingScans           | -1 | 监听线程扫描文件目录的剩余次数，默认持续扫描；假设指定其为3，那么在`File Watcher`线程完成3次后就会自动退出。 | 是       |
 
 # 5. 进阶
 
@@ -144,14 +143,71 @@ do {
 
 ### 5.4.1 FileWatcherProperties属性自动装配问题
 
-`FileWatcherProperties`由`file-watcher`组件定义且该组件并不依赖任何`Spring`组件，因此你无法在`FileWatcherProperties`头上追加`@ConfigurationProperties(prefix = "file-watcher")`注解。那么上层`Spring Boot`应用配置文件中所有以`file-watcher.`开头的相关配置项如何绑定到`FileWatcherProperties`实例中去呢？直接使用`Spring Boot`原生的`Relaxed Bingding` API，如下所示：
+`FileWatcherProperties`由`file-watcher`组件定义且该组件并不依赖任何`Spring`组件，那么在`FileWatcherProperties`头上是没有`@ConfigurationProperties(prefix = "file-watcher")`注解的且上层业务接入方也没有办法手动追加该注解。那么上层`Spring Boot`应用配置文件中所有以`file-watcher.`开头的相关配置项如何绑定到`FileWatcherProperties`实例中去呢？直接使用`Spring Boot`原生的`Relaxed Bingding` API是一个不错的选择。
 
+自`2.06`版本开始，`FileWatcherProperties`只为`pollInterval`、`quietPeriod`和`remainingScans`三个属性添加了`setter`方法，其他属性则需要在调用构造函数时指定，也就是说：`pollInterval`、`quietPeriod`和`remainingScans`这三个属性是允许监听线程在运行时修改的（mutable）属性，其他属性则是不允许在运行时修改的（immutable）属性！。一旦这样设计，这给手动通过`Relaxed Bingding` API来实现绑定也带来了一定的复杂度，也就是说下面代码是会报错的：
 ```java
  @Bean
  public FileWatcherProperties fileWatcherProperties(ConfigurableEnvironment environment) {
      return Binder.get(environment)
              .bind("file-watcher", Bindable.of(FileWatcherProperties.class))
              .orElse(new FileWatcherProperties());
+ }
+```
+完整代码如下：
+
+```java
+ @Order(Integer.MIN_VALUE + 1)
+ @Bean
+ @SuppressWarnings("unchecked")
+ public FileWatcherProperties fileWatcherProperties(ConfigurableEnvironment environment, ConversionService conversionService) {
+
+     List<String> excludedComplexProperties = Arrays.asList("directories", "acceptedstrategy");
+
+     Map<String, Object> properties = (Map<String, Object>) Binder.get(environment)
+             .bind("file-watcher", Bindable.of(Map.class), new BindHandler() {
+                 @Override
+                 public <T> Bindable<T> onStart(ConfigurationPropertyName name,
+                                                Bindable<T> target,
+                                                BindContext context) {
+                     // 忽略directories和accepted-strategy这俩属性
+                     if (excludedComplexProperties.stream().anyMatch(_name ->
+                             _name.equals(name.getLastElement(ConfigurationPropertyName.Form.UNIFORM)))) {
+                         return null;
+                     }
+                     return BindHandler.super.onStart(name, target, context);
+                 }
+             })
+             .get();
+
+     List<String> directories = (List<String>) Binder.get(environment)
+             .bind("file-watcher.directories",
+                     Bindable.of(ResolvableType.forClassWithGenerics(List.class, String.class)))
+             .get();
+     Map<MatchingStrategy, Set<String>> acceptedStrategy =
+             (Map<MatchingStrategy, Set<String>>) Binder.get(environment)
+                     .bind("file-watcher.accepted-strategy",
+                             Bindable.of(ResolvableType.forClassWithGenerics(
+                                     Map.class,
+                                     ResolvableType.forClass(MatchingStrategy.class),
+                                     ResolvableType.forClassWithGenerics(Set.class, ResolvableType.forClass(String.class))
+                             )))
+                     .get();
+     properties.put("directories", directories);
+     properties.put("accepted-strategy", acceptedStrategy);
+     // 没有必要使用Spring Boot的WebConversionService这个Bean，直接使用自己定义的ApplicationConversionService即可满足
+     ApplicationConversionService applicationConversionService = new ApplicationConversionService();
+     ApplicationConversionService.addApplicationConverters(applicationConversionService);
+     return FileWatcherPropertiesFactory.createFromMap(properties, (sourceType, targetType, value) -> {
+         if (applicationConversionService.canConvert(sourceType, targetType)) {
+             try {
+                 return applicationConversionService.convert(value, targetType);
+             } catch (ConversionFailedException e) {
+                 // Ignored
+             }
+         }
+         return value;
+     });
  }
 ```
 
@@ -244,39 +300,7 @@ public class FileSystemWatcherFactoryBean implements
 private Map<MatchingStrategy, Set<String>> acceptedStrategy = Map.of(ANY, Set.of());
 ```
 
-的确如此，但由于`Spring Boot`原生的`Relaxed Bingding`机制会针对`Map`类型有一个**merge**操作，这就导致最终绑定后`acceptedStrategy`的size为2，这是要避免的，如下：
-
-```java
- /**
-  * Sets the accepted strategy for file matching.
-  * If the accepted strategy contains the {@link io.github.dk900912.filewatcher.filter.MatchingStrategy#ANY} key,
-  * it will be filtered out first. After filtering, the accepted strategy must contain exactly one key, and the
-  * corresponding value must not be empty.
-  *
-  * @param acceptedStrategy the accepted strategy map
-  * @throws IllegalArgumentException if the accepted strategy is null, empty, contains more than one key after filtering,
-  *                                  or the value for the key is empty
-  */
- public void setAcceptedStrategy(Map<MatchingStrategy, Set<String>> acceptedStrategy) {
-     Assert.isTrue(acceptedStrategy != null && !acceptedStrategy.isEmpty(),
-             "AcceptedStrategy must not be null or empty");
-     boolean onlyAny = acceptedStrategy.keySet().stream().allMatch(ANY::equals);
-     if (!onlyAny) {
-         Map<MatchingStrategy, Set<String>> filteredStrategy = acceptedStrategy.entrySet().stream()
-                 .filter(entry -> !ANY.equals(entry.getKey()))
-                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-         Assert.isTrue(filteredStrategy.size() == 1,
-                 "AcceptedStrategy must contain exactly one key after filtering out ANY");
-         Assert.isTrue(filteredStrategy.values().stream().noneMatch(Set::isEmpty),
-                 "AcceptedStrategy must contain non-empty value for the key");
-         this.acceptedStrategy = filteredStrategy;
-     } else {
-         this.acceptedStrategy = acceptedStrategy;
-     }
- }
-```
-
-最后，来看看**merge**的大概流程：
+的确如此，但由于`Spring Boot`原生的`Relaxed Bingding`机制会针对`Map`类型有一个**merge**操作，这就导致最终绑定后`acceptedStrategy`的size为2，这是要避免的，来看看**merge**的大概流程：
 ```java
  private AggregateBinder<?> getAggregateBinder(Bindable<?> target, Context context) {
      Class<?> resolvedType = target.getType().resolve(Object.class);
@@ -309,3 +333,10 @@ protected Map<Object, Object> merge(Supplier<Map<Object, Object>> existing, Map<
    }
 }
 ```
+
+### 5.4.4 `File Watcher`守护线程是否会退出？
+
+一旦线程内部抛出运行时异常，`File Watcher`守护线程会退出，即使设置`setUncaughtExceptionHandler()`也依然会退出，这只是让你自定义线程因未捕获异常而终止时的行为，例如记录日志或执行某些清理操作，但它不能防止线程因未捕获的异常而退出。因此，**关于实现`FileChangeListener`有两个建议**：
+
+- 要有`try-catch`，防止`File Watcher`守护线程退出。
+- 异步化`onChange(Set<ChangedFiles> changeSet)`，避免个性化监听逻辑运行在`File Watcher`守护线程中。

@@ -6,14 +6,15 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,61 +26,126 @@ public class FileWatcherPropertiesTest {
     private FileWatcherProperties properties;
 
     @BeforeEach
-    void setUp() {
-        properties = new FileWatcherProperties();
+    void setup() {
+        List<String> dirs = Collections.singletonList(System.getProperty("user.dir"));
+        Map<MatchingStrategy, Set<String>> strategy = Map.of(MatchingStrategy.ANY, Set.of());
+        Duration pollInterval = Duration.ofSeconds(1);
+        Duration quietPeriod = Duration.ofMillis(400);
+
+        properties = new FileWatcherProperties(
+                true,
+                "Custom Watcher",
+                dirs,
+                strategy,
+                true,
+                3,
+                pollInterval,
+                quietPeriod
+        );
     }
 
     @Test
     void testDefaultValues() {
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
         assertTrue(properties.getDaemon());
         assertEquals("File Watcher", properties.getName());
-        assertEquals(-1, properties.getRemainingScans());
+        assertEquals(-1, properties.getRemainingScans().get());
         assertFalse(properties.getSnapshotEnabled());
-        assertNull(properties.getDirectories());
-        assertNull(properties.getAcceptedStrategy());
-        assertEquals(Duration.ofMillis(1000), properties.getPollInterval());
-        assertEquals(Duration.ofMillis(400), properties.getQuietPeriod());
+        assertEquals(System.getProperty("user.dir"), properties.getDirectories().getFirst());
+        assertEquals(Map.of(ANY, Set.of()), properties.getAcceptedStrategy());
+        assertEquals(Duration.ofMillis(1000), properties.getPollInterval().get());
+        assertEquals(Duration.ofMillis(400), properties.getQuietPeriod().get());
     }
 
     @Test
-    void testSetDirectories() {
+    void testGettersConsistency() {
+        List<String> dirs = Collections.singletonList(System.getProperty("user.dir"));
+        Map<MatchingStrategy, Set<String>> strategy = Map.of(MatchingStrategy.ANY, Set.of());
+        Duration pollInterval = Duration.ofSeconds(1);
+        Duration quietPeriod = Duration.ofMillis(400);
+
+        assertTrue(properties.getDaemon());
+        assertEquals("Custom Watcher", properties.getName());
+        assertEquals(dirs, properties.getDirectories());
+        assertEquals(strategy, properties.getAcceptedStrategy());
+        assertTrue(properties.getSnapshotEnabled());
+        assertEquals(3, properties.getRemainingScans().get());
+        assertEquals(pollInterval, properties.getPollInterval().get());
+        assertEquals(quietPeriod, properties.getQuietPeriod().get());
+    }
+
+    @Test
+    void testDirectories_ValidExisting() {
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
+        assertEquals(1, properties.getDirectories().size());
+        assertEquals(System.getProperty("user.dir"), properties.getDirectories().getFirst());
+    }
+
+    @Test
+    void testDirectories_NonExisting() {
         List<String> dirs = Arrays.asList("/path1", "/path2");
         assertThrows(IllegalArgumentException.class, () ->
-                properties.setDirectories(dirs)
+                new FileWatcherProperties(dirs)
         );
     }
 
     @Test
-    void testSetAcceptedStrategy_ValidInput() {
-        Map<MatchingStrategy, Set<String>> strategy = Map.of(
-            MatchingStrategy.REGEX, Set.of(".*\\.txt", ".*\\.xml")
+    void testDirectories_NullInput() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new FileWatcherProperties(null)
         );
-        properties.setAcceptedStrategy(strategy);
+    }
+
+    @Test
+    void testDirectories_EmptyList() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new FileWatcherProperties(Collections.emptyList())
+        );
+    }
+
+    @Test
+    void testDirectories_DuplicatePaths() {
+        List<String> dirs = Arrays.asList(System.getProperty("user.dir"), System.getProperty("user.dir"));
+        properties = new FileWatcherProperties(dirs);
+        assertEquals(1, properties.getDirectories().size());
+    }
+
+    @Test
+    void testAcceptedStrategy_ValidInput() {
+        Map<MatchingStrategy, Set<String>> strategy = Map.of(
+                MatchingStrategy.REGEX, Set.of(".*\\.txt", ".*\\.xml")
+        );
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy);
         assertEquals(strategy, properties.getAcceptedStrategy());
     }
 
     @Test
-    void testSetAcceptedStrategy_NullInput() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setAcceptedStrategy(null)
-        );
-    }
-
-    @Test
     void testSetAcceptedStrategy_EmptyMap() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setAcceptedStrategy(new HashMap<>())
+        assertThrows(IllegalArgumentException.class, () ->
+                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), Map.of())
         );
     }
 
     @Test
     void testSetAcceptedStrategy_EmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = Map.of(
-            MatchingStrategy.REGEX, Set.of()
+                MatchingStrategy.REGEX, Set.of()
         );
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setAcceptedStrategy(strategy)
+        assertThrows(IllegalArgumentException.class, () ->
+                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy)
         );
+    }
+
+    @Test
+    void testSetAcceptedStrategy_InvalidCombination() {
+        Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
+        strategy.put(MatchingStrategy.SUFFIX, Set.of(".jpg", ".txt"));
+        strategy.put(MatchingStrategy.REGEX, Set.of(".*\\.txt"));
+
+        final IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy)
+        );
+        assertEquals("AcceptedStrategy must contain exactly one key after filtering out ANY", exception.getMessage());
     }
 
     @Test
@@ -87,7 +153,7 @@ public class FileWatcherPropertiesTest {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.SUFFIX, Set.of());
         final IllegalArgumentException acceptedStrategyMustNotBeEmpty = assertThrows(IllegalArgumentException.class, () ->
-            properties.setAcceptedStrategy(strategy)
+                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy)
         );
         assertEquals("AcceptedStrategy must contain non-empty value for the key", acceptedStrategyMustNotBeEmpty.getMessage());
     }
@@ -96,7 +162,7 @@ public class FileWatcherPropertiesTest {
     void testSetAcceptedStrategy_SingleAnyStrategyWithEmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.ANY, Set.of());
-        properties.setAcceptedStrategy(strategy);
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy);
         assertEquals(strategy, properties.getAcceptedStrategy());
     }
 
@@ -107,68 +173,8 @@ public class FileWatcherPropertiesTest {
         strategy.put(MatchingStrategy.REGEX, Set.of(".*\\.txt"));
         strategy.put(MatchingStrategy.ANY, Set.of("**/*.xml"));
         final IllegalArgumentException acceptedStrategyMustBeOnlyOne = assertThrows(IllegalArgumentException.class, () ->
-                properties.setAcceptedStrategy(strategy)
+                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy)
         );
         assertEquals("AcceptedStrategy must contain exactly one key after filtering out ANY", acceptedStrategyMustBeOnlyOne.getMessage());
-    }
-
-    @Test
-    void testSetPollInterval_ValidDuration() {
-        Duration newInterval = Duration.ofMillis(2000);
-        properties.setPollInterval(newInterval);
-        assertEquals(newInterval, properties.getPollInterval());
-    }
-
-    @Test
-    void testSetPollInterval_ZeroDuration() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setPollInterval(Duration.ZERO)
-        );
-    }
-
-    @Test
-    void testSetPollInterval_NegativeDuration() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setPollInterval(Duration.ofMillis(-1000))
-        );
-    }
-
-    @Test
-    void testSetPollInterval_LessThanQuietPeriod() {
-        Duration quietPeriod = Duration.ofMillis(800);
-        properties.setQuietPeriod(quietPeriod);
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setPollInterval(Duration.ofMillis(500))
-        );
-    }
-
-    @Test
-    void testSetQuietPeriod_ValidDuration() {
-        Duration newQuietPeriod = Duration.ofMillis(200);
-        properties.setQuietPeriod(newQuietPeriod);
-        assertEquals(newQuietPeriod, properties.getQuietPeriod());
-    }
-
-    @Test
-    void testSetQuietPeriod_ZeroDuration() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setQuietPeriod(Duration.ZERO)
-        );
-    }
-
-    @Test
-    void testSetQuietPeriod_NegativeDuration() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setQuietPeriod(Duration.ofMillis(-400))
-        );
-    }
-
-    @Test
-    void testSetQuietPeriod_GreaterThanPollInterval() {
-        Duration pollInterval = Duration.ofMillis(1000);
-        properties.setPollInterval(pollInterval);
-        assertThrows(IllegalArgumentException.class, () -> 
-            properties.setQuietPeriod(Duration.ofMillis(2000))
-        );
     }
 }

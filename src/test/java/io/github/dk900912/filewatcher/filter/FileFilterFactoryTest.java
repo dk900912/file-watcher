@@ -4,6 +4,8 @@ import io.github.dk900912.filewatcher.FileWatcherProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -16,7 +18,7 @@ public class FileFilterFactoryTest {
 
     @BeforeEach
     void setUp() {
-        properties = new FileWatcherProperties();
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
     }
 
     @Test
@@ -26,7 +28,9 @@ public class FileFilterFactoryTest {
 
     @Test
     void testCreate_ValidAcceptedStrategy() {
-        properties.setAcceptedStrategy(Map.of(MatchingStrategy.ANY, Set.of()));
+        Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
+        strategy.put(MatchingStrategy.SUFFIX, Set.of(".jpg", ".txt"));
+        properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy);
         FileFilterFactory.create(properties);
     }
 
