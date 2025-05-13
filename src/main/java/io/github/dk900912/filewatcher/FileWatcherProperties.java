@@ -51,13 +51,13 @@ public class FileWatcherProperties {
     private final Boolean snapshotEnabled;
 
     // Mutable value at runtime
-    private final AtomicInteger remainingScans = new AtomicInteger(DEFAULT_REMAINING_SCANS);
+    private final AtomicInteger remainingScans = new AtomicInteger();
 
     // Mutable value at runtime
-    private final AtomicReference<Duration> pollInterval = new AtomicReference<>(DEFAULT_POLL_INTERVAL);
+    private final AtomicReference<Duration> pollInterval = new AtomicReference<>();
 
     // Mutable value at runtime
-    private final AtomicReference<Duration> quietPeriod = new AtomicReference<>(DEFAULT_QUIET_PERIOD);
+    private final AtomicReference<Duration> quietPeriod = new AtomicReference<>();
 
     public FileWatcherProperties(List<String> directories) {
         this(
@@ -106,10 +106,9 @@ public class FileWatcherProperties {
                 })
                 .toList();
         // Validate acceptedStrategy
-        if (acceptedStrategy == null) {
+        if (acceptedStrategy == null || acceptedStrategy.isEmpty()) {
             this.acceptedStrategy = DEFAULT_ACCEPTED_STRATEGY;
         } else {
-            Assert.isTrue(!acceptedStrategy.isEmpty(), "AcceptedStrategy must not be empty");
             boolean onlyAny = acceptedStrategy.keySet().stream().allMatch(ANY::equals);
             if (!onlyAny) {
                 Map<MatchingStrategy, Set<String>> filteredStrategy = acceptedStrategy.entrySet().stream()
@@ -127,15 +126,23 @@ public class FileWatcherProperties {
         this.snapshotEnabled = snapshotEnabled == null ? DEFAULT_SNAPSHOT_ENABLED : snapshotEnabled;
 
         // Validate remainingScans
-        Assert.isTrue(remainingScans > 0 || remainingScans == -1, "RemainingScans must be positive or -1");
-        this.remainingScans.set(remainingScans);
+        if (remainingScans != null) {
+            Assert.isTrue(remainingScans > 0 || remainingScans == -1, "RemainingScans must be positive or -1");
+            this.remainingScans.set(remainingScans);
+        } else {
+            this.remainingScans.set(DEFAULT_REMAINING_SCANS);
+        }
 
         // Validate pollInterval & quietPeriod
-        Assert.isTrue(pollInterval.toMillis() > 0, "PollInterval must be positive");
-        Assert.isTrue(quietPeriod.toMillis() > 0, "QuietPeriod must be positive");
-        Assert.isTrue(pollInterval.toMillis() > quietPeriod.toMillis(), "PollInterval must be greater than QuietPeriod");
-        this.pollInterval.set(pollInterval);
-        this.quietPeriod.set(quietPeriod);
+        Duration _pollInterval;
+        Duration _quietPeriod;
+        _pollInterval = pollInterval == null ? DEFAULT_POLL_INTERVAL : pollInterval;
+        _quietPeriod = quietPeriod == null ? DEFAULT_QUIET_PERIOD : quietPeriod;
+        Assert.isTrue(_pollInterval.toMillis() > 0, "PollInterval must be positive");
+        Assert.isTrue(_quietPeriod.toMillis() > 0, "QuietPeriod must be positive");
+        Assert.isTrue(_pollInterval.toMillis() > _quietPeriod.toMillis(), "PollInterval must be greater than QuietPeriod");
+        this.pollInterval.set(_pollInterval);
+        this.quietPeriod.set(_quietPeriod);
     }
 
     public Boolean getDaemon() {

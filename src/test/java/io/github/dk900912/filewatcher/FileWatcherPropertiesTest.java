@@ -120,13 +120,6 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_EmptyMap() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), Map.of())
-        );
-    }
-
-    @Test
     void testSetAcceptedStrategy_EmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = Map.of(
                 MatchingStrategy.REGEX, Set.of()

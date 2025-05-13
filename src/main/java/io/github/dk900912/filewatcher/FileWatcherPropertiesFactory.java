@@ -67,8 +67,12 @@ public class FileWatcherPropertiesFactory {
         for (Parameter parameter : mostParameterizedConstructor.getParameters()) {
             String parameterName = normalizePropertyName(parameter.getName());
             Object rawValue = normalizedProperties.get(parameterName);
-            Object convertedValue = propertyFunction == null ? rawValue : propertyFunction.apply(rawValue.getClass(), parameter.getType(), rawValue);
-            constructorArguments.add(convertedValue);
+            if (rawValue == null) {
+                constructorArguments.add(null);
+            } else {
+                Object convertedValue = propertyFunction == null ? rawValue : propertyFunction.apply(rawValue.getClass(), parameter.getType(), rawValue);
+                constructorArguments.add(convertedValue);
+            }
         }
 
         FileWatcherProperties fileWatcherProperties = null;
