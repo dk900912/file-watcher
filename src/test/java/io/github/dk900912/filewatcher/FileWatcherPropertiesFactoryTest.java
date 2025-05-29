@@ -1,17 +1,20 @@
 package io.github.dk900912.filewatcher;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,32 +27,53 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 public class FileWatcherPropertiesFactoryTest {
 
-    @TempDir
-    static Path tempDir;
+    private static Path testRoot;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        testRoot = Files.createTempDirectory("snapshot-test");
+    }
+
+    @AfterAll
+    public static void cleanup() throws IOException {
+        try (Stream<Path> pathStream = Files.walk(testRoot)) {
+            pathStream
+                    .sorted((a, b) -> -a.compareTo(b))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        }
+    }
 
     @Test
-    void testCreateFromMapWithEmpty() {
+    public void testCreateFromMapWithEmpty() {
         assertNull(FileWatcherPropertiesFactory.createFromMap(Map.of(), null));
     }
 
     @Test
-    void testCreateFromMapWithAllParameters() {
-        String validDir1 = tempDir.resolve("dir1").toString();
-        String validDir2 = tempDir.resolve("dir2").toString();
-        
+    public void testCreateFromMapWithAllParameters() {
+        Path validDir1 = testRoot.resolve("dir1");
+        Path validDir2 = testRoot.resolve("dir2");
+        Path repository = null;
+
         try {
-            Files.createDirectory(tempDir.resolve("dir1"));
-            Files.createDirectory(tempDir.resolve("dir2"));
+            Files.createDirectory(validDir1);
+            Files.createDirectory(validDir2);
+            repository = Files.createTempFile(testRoot, "file-watcher", ".snapshot", new FileAttribute[0]);
         } catch (IOException e) {
             fail("Failed to create test directories: " + e.getMessage());
         }
 
         Map<String, Object> properties = Map.of(
-            "directories", Arrays.asList(validDir1, validDir2),
+            "directories", Arrays.asList(validDir1.toString(), validDir2.toString()),
             "daemon", false,
             "name", "Custom Watcher",
             "acceptedStrategy", Map.of(),
-            "snapshotEnabled", true,
+            "snapshotState", new FileWatcherProperties.SnapshotState(true, repository.toString()),
             "remainingScans", 5,
             "pollInterval", Duration.ofMillis(2000),
             "quietPeriod", Duration.ofMillis(100)
@@ -68,22 +92,59 @@ public class FileWatcherPropertiesFactoryTest {
         assertEquals("Custom Watcher", propertiesInstance.getName());
         assertEquals(2, propertiesInstance.getDirectories().size());
         assertEquals(Map.of(ANY, Set.of()), propertiesInstance.getAcceptedStrategy());
-        assertEquals(true, propertiesInstance.getSnapshotEnabled());
+        assertEquals(true, propertiesInstance.getSnapshotState().getEnabled());
+        assertEquals(repository.toString(), propertiesInstance.getSnapshotState().getRepository());
         assertEquals(5, propertiesInstance.getRemainingScans().get());
         assertEquals(Duration.ofMillis(2000), propertiesInstance.getPollInterval().get());
     }
 
     @Test
-    void testCreateFromMapWithDefaultValues() {
-        String validDir = tempDir.resolve("default_dir").toString();
+    public void testCreateFromMapWithAllParameters_InvalidSnapshotState() {
+        Path validDir3 = testRoot.resolve("dir3");
+        Path validDir4 = testRoot.resolve("dir4");
+        Path repository = validDir3;
+
+        try {
+            Files.createDirectory(validDir3);
+            Files.createDirectory(validDir4);
+        } catch (IOException e) {
+            fail("Failed to create test directories: " + e.getMessage());
+        }
+
+        Map<String, Object> properties = Map.of(
+                "directories", Arrays.asList(validDir3.toString(), validDir4.toString()),
+                "daemon", false,
+                "name", "Custom Watcher",
+                "acceptedStrategy", Map.of(),
+                "snapshotState", new FileWatcherProperties.SnapshotState(true, repository.toString()),
+                "remainingScans", 5,
+                "pollInterval", Duration.ofMillis(2000),
+                "quietPeriod", Duration.ofMillis(100)
+        );
+
+        FileWatcherPropertiesFactory.PropertyFunction mockConverter = (sourceType, targetType, value) -> {
+            if (value instanceof Long && targetType == Duration.class) {
+                return Duration.ofMillis((Long) value);
+            }
+            return value;
+        };
+
+        assertNull(FileWatcherPropertiesFactory.createFromMap(properties, mockConverter));
+    }
+
+
+
+    @Test
+    public void testCreateFromMapWithDefaultValues() {
+        Path validDir5 = testRoot.resolve("dir5");
         
         try {
-            Files.createDirectory(tempDir.resolve("default_dir"));
+            Files.createDirectory(validDir5);
         } catch (IOException e) {
             fail("Failed to create test directory: " + e.getMessage());
         }
 
-        Map<String, Object> properties = Map.of("directories", List.of(validDir));
+        Map<String, Object> properties = Map.of("directories", List.of(validDir5.toString()));
         FileWatcherProperties propertiesInstance = FileWatcherPropertiesFactory.createFromMap(properties, null);
         assertNotNull(propertiesInstance);
         

@@ -50,7 +50,7 @@ public class DirectorySnapshot {
     /**
      * Constructs a new DirectorySnapshot instance. This constructor is intended for internal use only.
      *
-     * @param directory the directory to snapshot, must not be null
+     * @param directory the directory to snapshot must not be null
      * @param time the exact snapshot capture time
      * @param files the immutable set of file snapshots
      */
@@ -70,14 +70,14 @@ public class DirectorySnapshot {
      */
     private void collectFiles(File directory, Set<FileSnapshot> result) {
         File[] children = directory.listFiles();
-        // Process all entries in current directory
+        // Process all entries in the current directory
         if (children != null) {
             for (File child : children) {
                 // Recursively handle non-special directories (excluding "." and "..")
                 if (child.isDirectory() && !DOTS.contains(child.getName())) {
                     collectFiles(child, result);
                 } else if (child.isFile()) {
-                    // Add files to result set
+                    // Add files to a result set
                     result.add(new FileSnapshot(child));
                 }
             }
@@ -97,7 +97,7 @@ public class DirectorySnapshot {
         Assert.isTrue(snapshot.directory.equals(directory),
                 () -> "DirectorySnapshot's directory must be '" + directory + "'");
         Set<ChangedFile> changes = new LinkedHashSet<>();
-        // Map of previous files (this snapshot) with File as key.
+        // Map of previous files (this snapshot) with File as a key.
         // File equality is determined by path string comparison (case-sensitive on some OS)
         Map<File, FileSnapshot> previousFiles = getFilesMap();
         for (FileSnapshot currentFile : snapshot.files) {
@@ -105,7 +105,7 @@ public class DirectorySnapshot {
             if (acceptChangedFile(fileFilter, currentFile)) {
                 // Remove and get the previous file snapshot by current file's path.
                 // NOTE: File equality relies on path string comparison, not physical file identity.
-                // This means files with different path representations (even if pointing to same physical file)
+                // This means files with different path representations (even if pointing to the same physical file)
                 // will be considered different entries.
                 FileSnapshot previousFile = previousFiles.remove(currentFile.getFile());
                 if (previousFile == null) {
@@ -119,7 +119,7 @@ public class DirectorySnapshot {
             }
         }
         // Remaining entries in previousFiles represent:
-        // - Deleted files (original path no longer exists)
+        // - Deleted files (an original path no longer exists)
         // - Renamed files (original path will appear here as DELETE, new path already registered as ADD)
         for (FileSnapshot previousFile : previousFiles.values()) {
             if (acceptChangedFile(fileFilter, previousFile)) {

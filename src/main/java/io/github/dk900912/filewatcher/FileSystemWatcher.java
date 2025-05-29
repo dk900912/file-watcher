@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -70,8 +71,12 @@ public class FileSystemWatcher {
             File dir = new File(s);
             this.directories.put(dir, null);
         }
-        this.fileFilter = FileFilterFactory.create(this.properties);
-        this.snapshotStateRepository = properties.getSnapshotEnabled() ? SnapshotStateRepository.LOCAL : SnapshotStateRepository.NONE;
+        this.fileFilter = FileFilterFactory.create(properties);
+        if (properties.getSnapshotState().getEnabled()) {
+            this.snapshotStateRepository = new LocalSnapshotStateRepository(Paths.get(properties.getSnapshotState().getRepository()));
+        } else {
+            this.snapshotStateRepository = SnapshotStateRepository.NONE;
+        }
     }
 
     public void addListener(FileChangeListener fileChangeListener) {
@@ -213,7 +218,7 @@ public class FileSystemWatcher {
             int remainingScans = this.remainingScans.get();
             while (remainingScans > 0 || remainingScans == -1) {
                 if (logger.isDebugEnabled()) {
-                    logger.debug("o=={======> Starting directory scan for file changes. remaining-scans:{}, pool-intervals:{}ms, quiet-period:{}ms", remainingScans, this.pollInterval.get().toMillis(), this.quietPeriod.get().toMillis());
+                    logger.debug("o=={======> Starting directory scan for file changes. remaining-scans:{}, poll-interval:{} ms, quiet-period:{} ms", remainingScans, this.pollInterval.get().toMillis(), this.quietPeriod.get().toMillis());
                 }
                 try {
                     if (remainingScans > 0) {

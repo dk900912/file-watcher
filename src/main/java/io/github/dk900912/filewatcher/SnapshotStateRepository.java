@@ -13,8 +13,7 @@ public interface SnapshotStateRepository {
     SnapshotStateRepository NONE = new SnapshotStateRepository() {
 
         @Override
-        public void save(Object state) {
-        }
+        public void save(Object state) {}
 
         @Override
         public Object restore() {
@@ -22,11 +21,6 @@ public interface SnapshotStateRepository {
         }
 
     };
-
-    /**
-     * A {@link SnapshotStateRepository} that uses a local file to keep state.
-     */
-    SnapshotStateRepository LOCAL = LocalSnapshotStateRepository.INSTANCE;
 
     /**
      * Save the given state in the repository.

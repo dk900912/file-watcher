@@ -14,7 +14,6 @@ import java.io.ObjectOutputStream;
 import java.io.StreamCorruptedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,9 +38,7 @@ import static java.nio.file.StandardOpenOption.WRITE;
  * @author dukui
  * @see FileSystemWatcher
  */
-public class LocalSnapshotStateRepository implements SnapshotStateRepository {
-
-    static final LocalSnapshotStateRepository INSTANCE = new LocalSnapshotStateRepository(Paths.get("file-watcher.snapshot"));
+public final class LocalSnapshotStateRepository implements SnapshotStateRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalSnapshotStateRepository.class);
 
@@ -55,27 +52,27 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
     }
 
     /*
-     * ┌────────────── SAVE (Write Sequence) ──────────────┐
-     * │  ╭───────── Root Structure ────────╮              │
-     * │  │ 1. writeUTF(Version)            │              │
-     * │  │ 2. writeInt(Directory Count)    │              │
-     * │  ╰───────────┬─────────────────────╯              │
-     * │              │                                    │
-     * │              ▼                                    │
-     * │  ╭───────── Per Directory ─────────╮              │
-     * │  │ 3. writeUTF(Directory Path)     │              │
-     * │  │ 4. writeObject(Snapshot Time)   │              │
-     * │  │ 5. writeInt(File Count)         │              │
-     * │  ╰───────────┬─────────────────────╯              │
-     * │              │                                    │
-     * │              ▼                                    │
-     * │  ╭───────── Per File ──────────────╮              │
-     * │  │ 6. writeUTF(File Path)          │              │
-     * │  │ 7. writeBoolean(Existence)      │              │
-     * │  │ 8. writeLong(File Size)         │              │
-     * │  │ 9. writeLong(Last Modified)     │              │
-     * │  ╰─────────────────────────────────╯              │
-     * └───────────────────────────────────────────────────┘
+     * ┌──────── SAVE (Write Sequence) ────────┐
+     * │  ╭───────── Root Structure ────────╮  │
+     * │  │ 1. writeUTF(Version)            │  │
+     * │  │ 2. writeInt(Directory Count)    │  │
+     * │  ╰────────────────┬────────────────╯  │
+     * │                   │                   │
+     * │                   ▼                   │
+     * │  ╭───────── Per Directory ─────────╮  │
+     * │  │ 3. writeUTF(Directory Path)     │  │
+     * │  │ 4. writeObject(Snapshot Time)   │  │
+     * │  │ 5. writeInt(File Count)         │  │
+     * │  ╰────────────────┬────────────────╯  │
+     * │                   │                   │
+     * │                   ▼                   │
+     * │  ╭───────── Per File ──────────────╮  │
+     * │  │ 6. writeUTF(File Path)          │  │
+     * │  │ 7. writeBoolean(Existence)      │  │
+     * │  │ 8. writeLong(File Size)         │  │
+     * │  │ 9. writeLong(Last Modified)     │  │
+     * │  ╰─────────────────────────────────╯  │
+     * └───────────────────────────────────────┘
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -102,27 +99,27 @@ public class LocalSnapshotStateRepository implements SnapshotStateRepository {
     }
 
     /*
-     * ┌─────────── RESTORE (Read Sequence) ───────────────┐
-     * │  ╭───────── Root Structure ────────╮              │
-     * │  │ 1. readUTF(Version Check)       │              │
-     * │  │ 2. readInt(Directory Count)     │              │
-     * │  ╰───────────┬─────────────────────╯              │
-     * │              │                                    │
-     * │              ▼                                    │
-     * │  ╭───────── Per Directory ─────────╮              │
-     * │  │ 3. readUTF(Directory Path)      │              │
-     * │  │ 4. readObject(Snapshot Time)    │              │
-     * │  │ 5. readInt(File Count)          │              │
-     * │  ╰───────────┬─────────────────────╯              │
-     * │              │                                    │
-     * │              ▼                                    │
-     * │  ╭───────── Per File ──────────────╮              │
-     * │  │ 6. readUTF(File Path)           │              │
-     * │  │ 7. readBoolean(Existence)       │              │
-     * │  │ 8. readLong(File Size)          │              │
-     * │  │ 9. readLong(Last Modified)      │              │
-     * │  ╰─────────────────────────────────╯              │
-     * └───────────────────────────────────────────────────┘
+     * ┌─────── RESTORE (Read Sequence) ───────┐
+     * │  ╭───────── Root Structure ────────╮  │
+     * │  │ 1. readUTF(Version Check)       │  │
+     * │  │ 2. readInt(Directory Count)     │  │
+     * │  ╰────────────────┬────────────────╯  │
+     * │                   │                   │
+     * │                   ▼                   │
+     * │  ╭───────── Per Directory ─────────╮  │
+     * │  │ 3. readUTF(Directory Path)      │  │
+     * │  │ 4. readObject(Snapshot Time)    │  │
+     * │  │ 5. readInt(File Count)          │  │
+     * │  ╰────────────────┬────────────────╯  │
+     * │                   │                   │
+     * │                   ▼                   │
+     * │  ╭───────── Per File ──────────────╮  │
+     * │  │ 6. readUTF(File Path)           │  │
+     * │  │ 7. readBoolean(Existence)       │  │
+     * │  │ 8. readLong(File Size)          │  │
+     * │  │ 9. readLong(Last Modified)      │  │
+     * │  ╰─────────────────────────────────╯  │
+     * └───────────────────────────────────────┘
      */
     @Override
     public synchronized Object restore() {

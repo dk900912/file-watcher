@@ -12,7 +12,7 @@
 
 # 1. 介绍
 
-基于单个守护线程实现对本地多目标目录下的文件变更事件的监听功能。对于文件的重命名会先触发`ADD`事件，然后才是`DELETE`事件！`2.0.0`版本具备了文件快照本地持久化能力，这样在监听应用退出后，在这期间的文件变更事件依然可以被监听到！
+基于单个（守护）线程实现对本地多目标目录下的文件变更事件的监听功能。对于文件的重命名会先触发`ADD`事件，然后才是`DELETE`事件！`2.0.0`版本具备了文件快照本地持久化能力，这样在监听应用退出后，在这期间的文件变更事件依然可以被监听到！
 
 # 2. 如何获取本组件
 
@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.7</version>
+    <version>2.0.8</version>
 </dependency>
 ```
 # 3. 快速入门
@@ -46,16 +46,17 @@ public class FileWatcherApplication {
 
 主要配置项均由`FileWatcherProperties`承载，默认配置如下：
 
-| 配置项                      | 默认值                  | 说明                                                             | 运行时是否可变 |
-|--------------------------|----------------------|----------------------------------------------------------------|---------|
-| directories              | null                 | 监听目录列表，必须手动指定                                                  | 否       |
-| snapshotEnabled          | false                | 文件快照功能                                                         | 否       |
-| acceptedStrategy         | null                 | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器           | 否       |
-| pollInterval             | 1000ms               | 完整扫描周期的时间间隔，控制整体扫描频率                                           | 是       |
-| quietPeriod              | 400ms                | 文件变动后的静默观察期，用于确认变更是否稳定完成                                       | 是       |
-| daemon                   | true                 | 监听线程是否为守护线程                                                    | 否       |
-| name                     | "File Watcher"       | 监听线程名称                                                         | 否       |
-| remainingScans           | -1 | 监听线程扫描文件目录的剩余次数，默认持续扫描；假设指定其为3，那么在`File Watcher`线程完成3次后就会自动退出。 | 是       |
+| 配置项                      | 默认值            | 说明                                                                | 运行时是否可变 |
+|--------------------------|----------------|-------------------------------------------------------------------|---------|
+| directories              | null           | 监听目录列表，必须手动指定                                                     | 否       |
+| snapshotState.enabled    | false          | 文件快照功能，默认关闭；如果值为`true`，那么必须指定`repository`                         | 否       |
+| snapshotState.repository | null           | 文件快照仓库，是一个常规文件，用于保存某一时间的文件快照状态信息。如果不指定目录而仅仅是一个文件名，那么将使用上层接入应用的根目录 | 否       |
+| acceptedStrategy         | Any            | 文件匹配策略，如果未显示指定策略即意味着采用`AnyFilter`，即只要匹配到任何文件变更就触发监听器              | 否       |
+| pollInterval             | 1000ms         | 完整扫描周期的时间间隔，控制整体扫描频率                                              | 是       |
+| quietPeriod              | 400ms          | 文件变动后的静默观察期，用于确认变更是否稳定完成                                          | 是       |
+| daemon                   | true           | 监听线程是否为守护线程                                                       | 否       |
+| name                     | "File Watcher" | 监听线程名称                                                            | 否       |
+| remainingScans           | -1             | 监听线程扫描文件目录的剩余次数，默认持续扫描；假设指定其为3，那么在`File Watcher`线程完成3次后就会自动退出。    | 是       |
 
 # 5. 进阶
 
@@ -83,9 +84,7 @@ public class FileWatcherApplication {
 ```
 
 
-## 5.2 为什么设计文件快照
-
-> 文件快照本质上是一种基于`ObjectOutputStream`序列化与反序列化的本地持久化机制。
+## 5.2 为什么设计`SnapshotStateRepository`
 
 1. 如果监听应用退出后，在这期间（监听应用退出与监听应用重启之间）的文件变更事件是无法被监听到的；为了保持监听持续性，那么可以开启文件快照功能，默认关闭。
 2. 如果监听目录文件数量很大，无论是啥原因导致的重启监听应用，那么都会重新扫描整个目录，势必要消耗一定时间；为了减少扫描时间，可以开启文件快照功能，默认关闭。
@@ -157,58 +156,58 @@ do {
 完整代码如下：
 
 ```java
- @Order(Integer.MIN_VALUE + 1)
- @Bean
- @SuppressWarnings("unchecked")
- public FileWatcherProperties fileWatcherProperties(ConfigurableEnvironment environment, ConversionService conversionService) {
+@Bean
+public FileWatcherProperties fileWatcherProperties(ConfigurableEnvironment environment) {
 
-     List<String> excludedComplexProperties = Arrays.asList("directories", "acceptedstrategy");
+   List<String> excludedComplexProperties = Arrays.asList("directories", "acceptedstrategy", "snapshotstate");
 
-     Map<String, Object> properties = (Map<String, Object>) Binder.get(environment)
-             .bind("file-watcher", Bindable.of(Map.class), new BindHandler() {
-                 @Override
-                 public <T> Bindable<T> onStart(ConfigurationPropertyName name,
-                                                Bindable<T> target,
-                                                BindContext context) {
-                     // 忽略directories和accepted-strategy这俩属性
-                     if (excludedComplexProperties.stream().anyMatch(_name ->
-                             _name.equals(name.getLastElement(ConfigurationPropertyName.Form.UNIFORM)))) {
-                         return null;
-                     }
-                     return BindHandler.super.onStart(name, target, context);
+   Map<String, Object> properties = (Map<String, Object>) Binder.get(environment)
+           .bind("file-watcher", Bindable.of(Map.class), new BindHandler() {
+              @Override
+              public <T> Bindable<T> onStart(ConfigurationPropertyName name,
+                                             Bindable<T> target,
+                                             BindContext context) {
+                 if (excludedComplexProperties.stream().anyMatch(_name ->
+                         _name.equals(name.getLastElement(ConfigurationPropertyName.Form.UNIFORM)))) {
+                    return null;
                  }
-             })
-             .get();
+                 return BindHandler.super.onStart(name, target, context);
+              }
+           })
+           .get();
 
-     List<String> directories = (List<String>) Binder.get(environment)
-             .bind("file-watcher.directories",
-                     Bindable.of(ResolvableType.forClassWithGenerics(List.class, String.class)))
-             .get();
-     Map<MatchingStrategy, Set<String>> acceptedStrategy =
-             (Map<MatchingStrategy, Set<String>>) Binder.get(environment)
-                     .bind("file-watcher.accepted-strategy",
-                             Bindable.of(ResolvableType.forClassWithGenerics(
-                                     Map.class,
-                                     ResolvableType.forClass(MatchingStrategy.class),
-                                     ResolvableType.forClassWithGenerics(Set.class, ResolvableType.forClass(String.class))
-                             )))
-                     .get();
-     properties.put("directories", directories);
-     properties.put("accepted-strategy", acceptedStrategy);
-     // 没有必要使用Spring Boot的WebConversionService这个Bean，直接使用自己定义的ApplicationConversionService即可满足
-     ApplicationConversionService applicationConversionService = new ApplicationConversionService();
-     ApplicationConversionService.addApplicationConverters(applicationConversionService);
-     return FileWatcherPropertiesFactory.createFromMap(properties, (sourceType, targetType, value) -> {
-         if (applicationConversionService.canConvert(sourceType, targetType)) {
-             try {
-                 return applicationConversionService.convert(value, targetType);
-             } catch (ConversionFailedException e) {
-                 // Ignored
-             }
+   List<String> directories = (List<String>) Binder.get(environment)
+           .bind("file-watcher.directories", Bindable.of(ResolvableType.forClassWithGenerics(List.class, String.class)))
+           .get();
+   Map<MatchingStrategy, Set<String>> acceptedStrategy =
+           (Map<MatchingStrategy, Set<String>>) Binder.get(environment)
+                   .bind("file-watcher.accepted-strategy",
+                           Bindable.of(ResolvableType.forClassWithGenerics(
+                                   Map.class,
+                                   ResolvableType.forClass(MatchingStrategy.class),
+                                   ResolvableType.forClassWithGenerics(Set.class, ResolvableType.forClass(String.class))
+                           )))
+                   .get();
+   FileWatcherProperties.SnapshotState snapshotState = (FileWatcherProperties.SnapshotState) Binder.get(environment)
+           .bind("file-watcher.snapshot-state", Bindable.of(FileWatcherProperties.SnapshotState.class))
+           .get();
+   properties.put("directories", directories);
+   properties.put("accepted-strategy", acceptedStrategy);
+   properties.put("snapshot-state", snapshotState);
+
+   ApplicationConversionService applicationConversionService = new ApplicationConversionService();
+   ApplicationConversionService.addApplicationConverters(applicationConversionService);
+   return FileWatcherPropertiesFactory.createFromMap(properties, (sourceType, targetType, value) -> {
+      if (applicationConversionService.canConvert(sourceType, targetType)) {
+         try {
+            return applicationConversionService.convert(value, targetType);
+         } catch (ConversionFailedException e) {
+            // Ignored
          }
-         return value;
-     });
- }
+      }
+      return value;
+   });
+}
 ```
 
 ### 5.4.2 FileSystemWatcher优雅启停问题
@@ -333,6 +332,12 @@ protected Map<Object, Object> merge(Supplier<Map<Object, Object>> existing, Map<
    }
 }
 ```
+
+> 参考`Spring`定义默认值的套路，也可以规避这个问题：
+>> ```java
+>> private static final Map<MatchingStrategy, Set<String>> DEFAULT_ACCEPTED_STRATEGY = Map.of(ANY, Set.of());
+>> private final Map<MatchingStrategy, Set<String>> acceptedStrategy;
+>>```
 
 ### 5.4.4 `File Watcher`守护线程是否会退出？
 

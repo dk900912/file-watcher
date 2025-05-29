@@ -15,6 +15,7 @@ import java.util.Set;
 import static io.github.dk900912.filewatcher.filter.MatchingStrategy.ANY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,7 +27,7 @@ public class FileWatcherPropertiesTest {
     private FileWatcherProperties properties;
 
     @BeforeEach
-    void setup() {
+    public void setup() {
         List<String> dirs = Collections.singletonList(System.getProperty("user.dir"));
         Map<MatchingStrategy, Set<String>> strategy = Map.of(MatchingStrategy.ANY, Set.of());
         Duration pollInterval = Duration.ofSeconds(1);
@@ -37,7 +38,7 @@ public class FileWatcherPropertiesTest {
                 "Custom Watcher",
                 dirs,
                 strategy,
-                true,
+                null,
                 3,
                 pollInterval,
                 quietPeriod
@@ -45,12 +46,13 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testDefaultValues() {
+    public void testDefaultValues() {
         properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
         assertTrue(properties.getDaemon());
         assertEquals("File Watcher", properties.getName());
         assertEquals(-1, properties.getRemainingScans().get());
-        assertFalse(properties.getSnapshotEnabled());
+        assertFalse(properties.getSnapshotState().getEnabled());
+        assertNull(properties.getSnapshotState().getRepository());
         assertEquals(System.getProperty("user.dir"), properties.getDirectories().getFirst());
         assertEquals(Map.of(ANY, Set.of()), properties.getAcceptedStrategy());
         assertEquals(Duration.ofMillis(1000), properties.getPollInterval().get());
@@ -58,7 +60,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testGettersConsistency() {
+    public void testGettersConsistency() {
         List<String> dirs = Collections.singletonList(System.getProperty("user.dir"));
         Map<MatchingStrategy, Set<String>> strategy = Map.of(MatchingStrategy.ANY, Set.of());
         Duration pollInterval = Duration.ofSeconds(1);
@@ -68,21 +70,22 @@ public class FileWatcherPropertiesTest {
         assertEquals("Custom Watcher", properties.getName());
         assertEquals(dirs, properties.getDirectories());
         assertEquals(strategy, properties.getAcceptedStrategy());
-        assertTrue(properties.getSnapshotEnabled());
+        assertFalse(properties.getSnapshotState().getEnabled());
+        assertNull(properties.getSnapshotState().getRepository());
         assertEquals(3, properties.getRemainingScans().get());
         assertEquals(pollInterval, properties.getPollInterval().get());
         assertEquals(quietPeriod, properties.getQuietPeriod().get());
     }
 
     @Test
-    void testDirectories_ValidExisting() {
+    public void testDirectories_ValidExisting() {
         properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
         assertEquals(1, properties.getDirectories().size());
         assertEquals(System.getProperty("user.dir"), properties.getDirectories().getFirst());
     }
 
     @Test
-    void testDirectories_NonExisting() {
+    public void testDirectories_NonExisting() {
         List<String> dirs = Arrays.asList("/path1", "/path2");
         assertThrows(IllegalArgumentException.class, () ->
                 new FileWatcherProperties(dirs)
@@ -90,28 +93,28 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testDirectories_NullInput() {
+    public void testDirectories_NullInput() {
         assertThrows(IllegalArgumentException.class, () ->
                 new FileWatcherProperties(null)
         );
     }
 
     @Test
-    void testDirectories_EmptyList() {
+    public void testDirectories_EmptyList() {
         assertThrows(IllegalArgumentException.class, () ->
                 new FileWatcherProperties(Collections.emptyList())
         );
     }
 
     @Test
-    void testDirectories_DuplicatePaths() {
+    public void testDirectories_DuplicatePaths() {
         List<String> dirs = Arrays.asList(System.getProperty("user.dir"), System.getProperty("user.dir"));
         properties = new FileWatcherProperties(dirs);
         assertEquals(1, properties.getDirectories().size());
     }
 
     @Test
-    void testAcceptedStrategy_ValidInput() {
+    public void testAcceptedStrategy_ValidInput() {
         Map<MatchingStrategy, Set<String>> strategy = Map.of(
                 MatchingStrategy.REGEX, Set.of(".*\\.txt", ".*\\.xml")
         );
@@ -120,7 +123,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_EmptyPatterns() {
+    public void testSetAcceptedStrategy_EmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = Map.of(
                 MatchingStrategy.REGEX, Set.of()
         );
@@ -130,7 +133,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_InvalidCombination() {
+    public void testSetAcceptedStrategy_InvalidCombination() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.SUFFIX, Set.of(".jpg", ".txt"));
         strategy.put(MatchingStrategy.REGEX, Set.of(".*\\.txt"));
@@ -142,7 +145,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_SingleNonAnyStrategyWithEmptyPatterns() {
+    public void testSetAcceptedStrategy_SingleNonAnyStrategyWithEmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.SUFFIX, Set.of());
         final IllegalArgumentException acceptedStrategyMustNotBeEmpty = assertThrows(IllegalArgumentException.class, () ->
@@ -152,7 +155,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_SingleAnyStrategyWithEmptyPatterns() {
+    public void testSetAcceptedStrategy_SingleAnyStrategyWithEmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.ANY, Set.of());
         properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy);
@@ -160,7 +163,7 @@ public class FileWatcherPropertiesTest {
     }
 
     @Test
-    void testSetAcceptedStrategy_MultipleStrategiesWithNonEmptyPatterns() {
+    public void testSetAcceptedStrategy_MultipleStrategiesWithNonEmptyPatterns() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.SUFFIX, Set.of(".jpg", ".txt"));
         strategy.put(MatchingStrategy.REGEX, Set.of(".*\\.txt"));

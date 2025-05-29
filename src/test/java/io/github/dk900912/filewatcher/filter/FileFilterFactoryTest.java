@@ -17,17 +17,17 @@ public class FileFilterFactoryTest {
     private FileWatcherProperties properties;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")));
     }
 
     @Test
-    void testCreate_NullAcceptedStrategy() {
+    public void testCreate_NullAcceptedStrategy() {
         FileFilterFactory.create(properties);
     }
 
     @Test
-    void testCreate_ValidAcceptedStrategy() {
+    public void testCreate_ValidAcceptedStrategy() {
         Map<MatchingStrategy, Set<String>> strategy = new HashMap<>();
         strategy.put(MatchingStrategy.SUFFIX, Set.of(".jpg", ".txt"));
         properties = new FileWatcherProperties(Collections.singletonList(System.getProperty("user.dir")), strategy);

@@ -14,18 +14,20 @@ import java.nio.file.Path;
  * @author dukui
  */
 public class FileSnapshotTest {
+
     private static File testFile;
+
     private static final String TEST_FILE_NAME = "FileSnapshotTest";
 
     @BeforeAll
-    static void setup() throws IOException {
+    public static void setup() throws IOException {
         // 1. Create a test file before all tests
         Path path = Files.createTempFile(TEST_FILE_NAME, null);
         testFile = path.toFile();
     }
 
     @AfterAll
-    static void cleanup() {
+    public static void cleanup() {
         // 2. Delete a test file after all tests
         if (testFile != null && testFile.exists()) {
             Assert.isTrue(testFile.delete(), "Failed to delete test file");
@@ -33,7 +35,7 @@ public class FileSnapshotTest {
     }
 
     @Test
-    void testConstructorWithFileOnly() {
+    public void testConstructorWithFileOnly() {
         // 3.1 Test constructor with File parameter
         FileSnapshot snapshot = new FileSnapshot(testFile);
 
@@ -45,7 +47,7 @@ public class FileSnapshotTest {
     }
 
     @Test
-    void testConstructorEquivalence() {
+    public void testConstructorEquivalence() {
         // 3.2 Verify equivalence between two constructors
         FileSnapshot autoSnapshot = new FileSnapshot(testFile);
         FileSnapshot manualSnapshot = new FileSnapshot(

@@ -53,7 +53,8 @@ public class FileWatcherPropertiesFactory {
     public static FileWatcherProperties createFromMap(Map<String, Object> properties, PropertyFunction propertyFunction) {
         Assert.notNull(properties, "Properties must not be null");
 
-        Map<String, Object> normalizedProperties = properties.entrySet().stream()
+        Map<String, Object> normalizedProperties = properties.entrySet()
+                .stream()
                 .map(entry -> {
                     String normalizedKey = normalizePropertyName(entry.getKey());
                     return Map.entry(normalizedKey, entry.getValue());

@@ -65,7 +65,7 @@ public class FileSystemWatcherTest {
         assertFalse(watcherThread.isAlive());
     }
 
-    static class TestUtils {
+    public static class TestUtils {
         public static Object getPrivateField(Object instance, String fieldName) throws Exception {
             Field field = instance.getClass().getDeclaredField(fieldName);
             field.setAccessible(true);

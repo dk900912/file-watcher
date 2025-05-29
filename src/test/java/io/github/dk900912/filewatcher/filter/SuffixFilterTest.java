@@ -25,7 +25,7 @@ public class SuffixFilterTest {
     }
 
     @Test
-    void accept() {}
+    public void accept() {}
 
     @Test
     public void accept_NoDotInFileName_ReturnsFalse() {

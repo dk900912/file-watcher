@@ -20,13 +20,15 @@ import java.util.stream.Stream;
  * @author dukui
  */
 public class LocalSnapshotStateRepositoryTest {
+
     private static final int MIN_DIRECTORIES = 3;
     private static final int FILES_PER_DIR = 2;
+
     private static Path testRoot;
     private static LocalSnapshotStateRepository repository;
 
     @BeforeAll
-    static void setup() throws IOException {
+    public static void setup() throws IOException {
         testRoot = Files.createTempDirectory("snapshot-test");
         repository = new LocalSnapshotStateRepository(testRoot.resolve("state.ser"));
 
@@ -39,7 +41,7 @@ public class LocalSnapshotStateRepositoryTest {
     }
 
     @AfterAll
-    static void cleanup() throws IOException {
+    public static void cleanup() throws IOException {
         try (Stream<Path> pathStream = Files.walk(testRoot)) {
             pathStream
                     .sorted((a, b) -> -a.compareTo(b))
@@ -70,7 +72,7 @@ public class LocalSnapshotStateRepositoryTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void testSaveAndRestoreConsistency() {
+    public void testSaveAndRestoreConsistency() {
         Map<File, DirectorySnapshot> original = createSnapshotMap();
 
         repository.save(original);
@@ -81,7 +83,7 @@ public class LocalSnapshotStateRepositoryTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void testSaveAndRestoreAfterModification() throws IOException {
+    public void testSaveAndRestoreAfterModification() throws IOException {
         Path firstFile = testRoot.resolve("dir0/file0.txt");
         Files.writeString(firstFile, "modified content");
 
@@ -127,7 +129,6 @@ public class LocalSnapshotStateRepositoryTest {
         Assert.isTrue(expected.getFile().equals(actual.getFile()), "File path mismatch");
         Assert.isTrue(expected.exists() == actual.exists(), "Existence mismatch");
         Assert.isTrue(expected.getLength() == actual.getLength(), "File size mismatch");
-        Assert.isTrue(expected.getLastModified() == actual.getLastModified(),
-                "Last modified time mismatch");
+        Assert.isTrue(expected.getLastModified() == actual.getLastModified(), "Last modified time mismatch");
     }
 }
