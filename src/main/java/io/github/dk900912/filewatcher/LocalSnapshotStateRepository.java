@@ -129,7 +129,7 @@ public final class LocalSnapshotStateRepository implements SnapshotStateReposito
         }
 
         if (storage.toFile().length() == 0) {
-            logger.info("The snapshot file is empty, which renders restoration unnecessary. However, an empty snapshot is considered invalid and may indicate potential issues");
+            logger.info("The snapshot file is empty, which renders restoration unnecessary");
             return null;
         }
 

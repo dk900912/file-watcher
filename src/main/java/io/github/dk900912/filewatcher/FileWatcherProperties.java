@@ -146,8 +146,17 @@ public class FileWatcherProperties {
         if (snapshotState != null && snapshotState.getEnabled()) {
             Assert.hasText(snapshotState.getRepository(), "SnapshotState's repository must not be empty");
             Path repository = Paths.get(snapshotState.getRepository());
-            Assert.isTrue(Files.exists(repository) && Files.isRegularFile(repository, LinkOption.NOFOLLOW_LINKS),
-                    "SnapshotState's repository '" + repository + "' must be an existing regular file and symbolic links are not allowed");
+            boolean exists = Files.exists(repository);
+            // If snapshot is a symbolic link (e.g. repository -> /data/file.txt),
+            // Files.isRegularFile(path, NOFOLLOW_LINKS) will return false because
+            // the check is performed on the link itself rather than the target.
+            // Symbolic links are not allowed here for security reasons.
+            if (exists) {
+                Assert.isTrue(!Files.isDirectory(repository, LinkOption.NOFOLLOW_LINKS),
+                        "SnapshotState's repository '" + repository + "' must be a regular file, directories are not allowed");
+                Assert.isTrue(Files.isRegularFile(repository, LinkOption.NOFOLLOW_LINKS),
+                        "SnapshotState's repository '" + repository + "' must be a regular file, symbolic links are not allowed");
+            }
             this.snapshotState = snapshotState;
         } else {
             this.snapshotState = DEFAULT_SNAPSHOT_STATE;
