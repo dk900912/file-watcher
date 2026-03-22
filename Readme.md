@@ -20,7 +20,7 @@
 <dependency>
     <groupId>io.github.dk900912</groupId>
     <artifactId>file-watcher</artifactId>
-    <version>2.0.8</version>
+    <version>2.0.9</version>
 </dependency>
 ```
 # 3. 快速入门

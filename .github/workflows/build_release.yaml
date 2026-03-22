@@ -1,0 +1,55 @@
+name: Build and Release
+
+# 触发条件：
+# 1. 代码推送到 main/master 分支
+# 2. 提交 PR
+# 3. 推送以 'v' 开头的 Tag（例如 v1.0.0）
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+# 核心防坑点：必须赋予 GITHUB_TOKEN 写权限，否则无法创建 Release
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 配置 Java 21 环境并开启 Maven 缓存（极速构建）
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # 3. 执行 Maven 编译打包
+      - name: Build with Maven
+        run: mvn clean package --batch-mode --no-transfer-progress
+
+      # 4. 常规产物保留（不管是不是打 Tag，只要跑成功了就留一份 JAR 包在后台）
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-watcher-jar
+          path: target/*.jar # 抓取 target 目录下所有的 jar 文件
+          retention-days: 7
+
+      # 5. 🎉 自动发布高逼格 Release（仅在推送 Tag 时执行）
+      - name: 🎉 Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        # 条件判断：只有当前触发 Action 的是一个形如 v1.0.0 的 Tag 时，才执行此步骤
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: target/*.jar # 直接把刚才编译好的 jar 包挂载到 Release 附件中
+          generate_release_notes: true # 自动魔法：根据两次 Release 之间的 Commit 和 PR 自动生成更新日志
